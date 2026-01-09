@@ -893,7 +893,7 @@
     <script>
         // Google Drive Configuration
         const GOOGLE_CLIENT_ID = '248764468426-rtntbe65ipmg6ugud186nok0jjl1dgeb.apps.googleusercontent.com';
-        const GOOGLE_API_KEY = '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';
+        const GOOGLE_API_KEY = 'AIzaSyD7bMlSNVfqPQFdupxyi7NqARFui71WS4E';
         const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"];
         const SCOPES = 'https://www.googleapis.com/auth/drive.file';
         
@@ -1387,9 +1387,9 @@
                     discoveryDocs: DISCOVERY_DOCS,
                 });
                 gapiInited = true;
-                console.log('GAPI initialized successfully');
+                console.log('✅ GAPI initialized successfully with API Key');
             } catch (error) {
-                console.error('Error initializing GAPI:', error);
+                console.error('❌ Error initializing GAPI:', error);
                 showToast('Failed to initialize Google Drive API', 'error');
             }
         }
@@ -1402,19 +1402,15 @@
                     callback: '', // Will be set when sync is called
                 });
                 gisInited = true;
-                console.log('GIS initialized successfully');
+                console.log('✅ GIS initialized successfully');
+                console.log('🎉 Google Drive is ready! You can now sync.');
             } catch (error) {
-                console.error('Error initializing GIS:', error);
+                console.error('❌ Error initializing GIS:', error);
                 showToast('Failed to initialize Google authentication', 'error');
             }
         }
         
         function syncToGoogleDrive() {
-            if (GOOGLE_API_KEY === 'YOUR_API_KEY_HERE') {
-                showGoogleDriveSetupModal();
-                return;
-            }
-            
             if (chapters.length === 0) {
                 showToast('No chapters to sync!', 'error');
                 return;
