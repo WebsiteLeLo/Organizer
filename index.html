@@ -886,13 +886,9 @@
     <input type="file" id="fileInput" accept="image/*" multiple>
     <input type="file" id="importInput" accept=".json" style="display: none;">
     
-    <!-- Google Drive API -->
-    <script src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
-    <script src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
-    
     <script>
         // Google Drive Configuration
-        const GOOGLE_CLIENT_ID = '248764468426-rtntbe65ipmg6ugud186nok0jjl1dgeb.apps.googleusercontent.com';
+        const GOOGLE_CLIENT_ID = '248764468426-pcpi554okuf7vr1ovjirg6fjaa9l1sa0.apps.googleusercontent.com';
         const GOOGLE_API_KEY = 'AIzaSyD7bMlSNVfqPQFdupxyi7NqARFui71WS4E';
         const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"];
         const SCOPES = 'https://www.googleapis.com/auth/drive.file';
@@ -1400,6 +1396,8 @@
                     client_id: GOOGLE_CLIENT_ID,
                     scope: SCOPES,
                     callback: '', // Will be set when sync is called
+                    // Use popup mode to avoid redirect_uri issues
+                    ux_mode: 'popup',
                 });
                 gisInited = true;
                 console.log('✅ GIS initialized successfully');
@@ -1784,5 +1782,9 @@
             }
         });
     </script>
+    
+    <!-- Google Drive API - Load after functions are defined -->
+    <script src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+    <script src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
 </body>
 </html>
