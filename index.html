@@ -1,0 +1,1792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notes Organizer - Manage Your Study Notes</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --primary: #4f46e5;
+            --primary-dark: #4338ca;
+            --primary-light: #eef2ff;
+            --secondary: #10b981;
+            --danger: #ef4444;
+            --bg-main: #f8fafc;
+            --bg-sidebar: #ffffff;
+            --bg-card: #ffffff;
+            --bg-hover: #f1f5f9;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --border: #e2e8f0;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-main);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+        
+        .layout {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            min-height: 100vh;
+        }
+        
+        /* Sidebar Styles */
+        .sidebar {
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            position: sticky;
+            top: 0;
+        }
+        
+        .sidebar-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+        
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .logo-text {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            line-height: 1.4;
+            margin-bottom: 16px;
+        }
+        
+        .backup-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 16px;
+        }
+        
+        .backup-actions button:first-child {
+            grid-column: 1 / -1;
+        }
+        
+        .btn-backup {
+            flex: 1;
+            padding: 8px 12px;
+            background: var(--bg-main);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            color: var(--text-primary);
+        }
+        
+        .btn-backup:hover {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+            transform: translateY(-1px);
+        }
+        
+        .auto-sync-toggle {
+            margin-top: 12px;
+            padding: 12px;
+            background: var(--bg-main);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        
+        .toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 0.875rem;
+        }
+        
+        .toggle-label input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+        
+        .toggle-text {
+            color: var(--text-secondary);
+            user-select: none;
+        }
+        
+        .add-chapter-section {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .section-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+        
+        .input-wrapper {
+            position: relative;
+            margin-bottom: 12px;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 10px 12px 10px 40px;
+            background: var(--bg-main);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.2s ease;
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+        
+        .input-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+            pointer-events: none;
+        }
+        
+        .btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: 'Inter', sans-serif;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+        
+        .btn-success {
+            background: var(--secondary);
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #059669;
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+        
+        /* Chapters List */
+        .chapters-section {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .sidebar-footer {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border);
+            background: var(--bg-main);
+        }
+        
+        .author-info {
+            text-align: center;
+        }
+        
+        .author-label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+        }
+        
+        .author-name {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .chapters-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .chapter-item {
+            padding: 12px;
+            background: var(--bg-main);
+            border: 1px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .chapter-item:hover {
+            border-color: var(--border);
+            background: var(--bg-hover);
+        }
+        
+        .chapter-item.active {
+            border-color: var(--primary);
+            background: var(--primary-light);
+        }
+        
+        .chapter-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .chapter-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+            font-size: 0.875rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .chapter-count {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .btn-icon {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        
+        .btn-icon:hover {
+            background: var(--danger);
+            color: white;
+        }
+        
+        .chapter-actions-group {
+            display: flex;
+            gap: 4px;
+        }
+        
+        /* Main Content Area */
+        .content-area {
+            padding: 32px;
+            overflow-y: auto;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--text-secondary);
+        }
+        
+        .empty-state svg {
+            margin-bottom: 24px;
+            opacity: 0.3;
+        }
+        
+        .empty-state h3 {
+            font-size: 1.25rem;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+        
+        .chapter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .chapter-title {
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        
+        .chapter-actions {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .upload-area {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 48px;
+            text-align: center;
+            margin-bottom: 32px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: var(--bg-card);
+        }
+        
+        .upload-area:hover {
+            border-color: var(--primary);
+            background: var(--primary-light);
+        }
+        
+        .upload-area.dragover {
+            border-color: var(--primary);
+            background: var(--primary-light);
+            transform: scale(1.01);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .upload-icon {
+            margin-bottom: 16px;
+            opacity: 0.4;
+        }
+        
+        .upload-text {
+            font-size: 1rem;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        
+        .upload-subtext {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+        
+        .questions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 24px;
+        }
+        
+        .question-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+            position: relative;
+            cursor: grab;
+        }
+        
+        .question-card:active {
+            cursor: grabbing;
+        }
+        
+        .question-card.dragging {
+            opacity: 0.5;
+            transform: rotate(2deg);
+        }
+        
+        .question-card.drag-over {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-light);
+            transform: scale(1.02);
+        }
+        
+        .question-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--primary);
+        }
+        
+        .question-card.dragging:hover {
+            transform: rotate(2deg);
+        }
+        
+        .drag-handle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(79, 70, 229, 0.9);
+            color: white;
+            padding: 6px 8px;
+            border-radius: 6px;
+            cursor: grab;
+            z-index: 5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .drag-handle:active {
+            cursor: grabbing;
+        }
+        
+        .question-number {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            background: var(--primary);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            z-index: 10;
+            box-shadow: var(--shadow);
+        }
+        
+        .question-image {
+            width: 100%;
+            height: 200px;
+            object-fit: contain;
+            background: #f8fafc;
+            padding: 16px;
+            cursor: pointer;
+        }
+        
+        .question-actions {
+            padding: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-main);
+            border-top: 1px solid var(--border);
+        }
+        
+        .reorder-buttons {
+            display: flex;
+            gap: 4px;
+        }
+        
+        .btn-icon-small {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+        }
+        
+        .btn-icon-small:hover:not(:disabled) {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        
+        .btn-icon-small:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        
+        .question-label {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: var(--text-primary);
+            color: white;
+            padding: 16px 20px;
+            border-radius: 10px;
+            box-shadow: var(--shadow-lg);
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+            font-weight: 500;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.2s ease;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: var(--bg-card);
+            border-radius: 16px;
+            max-width: 95%;
+            max-height: 95%;
+            box-shadow: var(--shadow-lg);
+            animation: zoomIn 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .modal-counter {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .modal-close {
+            background: var(--bg-hover);
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: var(--text-secondary);
+        }
+        
+        .modal-close:hover {
+            background: var(--danger);
+            color: white;
+        }
+        
+        .modal-image-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        .modal-nav {
+            position: absolute;
+            background: rgba(79, 70, 229, 0.9);
+            border: none;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: white;
+            z-index: 10;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .modal-nav:hover {
+            background: rgba(67, 56, 202, 1);
+            transform: scale(1.1);
+        }
+        
+        .modal-nav:active {
+            transform: scale(0.95);
+        }
+        
+        .modal-nav-left {
+            left: 30px;
+        }
+        
+        .modal-nav-right {
+            right: 30px;
+        }
+        
+        .modal-image {
+            max-width: 100%;
+            max-height: 70vh;
+            border-radius: 8px;
+            object-fit: contain;
+        }
+        
+        .modal-hint {
+            padding: 12px 20px;
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            border-top: 1px solid var(--border);
+            background: var(--bg-main);
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes zoomIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        
+        /* SVG Icon Styles */
+        .icon {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+        
+        .icon-sm {
+            width: 16px;
+            height: 16px;
+        }
+        
+        .icon-lg {
+            width: 64px;
+            height: 64px;
+        }
+        
+        @media (max-width: 1024px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+            
+            .sidebar {
+                position: relative;
+                height: auto;
+            }
+        }
+        
+        @media (max-width: 640px) {
+            .logo-text {
+                font-size: 1.125rem;
+            }
+            
+            .questions-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .content-area {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <svg class="icon" fill="none" viewBox="0 0 24 24" stroke="white">
+                            <rect x="4" y="3" width="16" height="18" rx="2" stroke-width="2"/>
+                            <line x1="8" y1="7" x2="16" y2="7" stroke-width="2" stroke-linecap="round"/>
+                            <line x1="8" y1="11" x2="16" y2="11" stroke-width="2" stroke-linecap="round"/>
+                            <line x1="8" y1="15" x2="13" y2="15" stroke-width="2" stroke-linecap="round"/>
+                            <circle cx="18" cy="18" r="3" fill="#10b981" stroke="white" stroke-width="1.5"/>
+                            <path d="M17 18l.5.5L19 17" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                        </svg>
+                    </div>
+                    <span class="logo-text">Notes Organizer</span>
+                </div>
+                <p class="subtitle">Organize and manage your study notes efficiently</p>
+                
+                <div class="backup-actions">
+                    <button class="btn-backup" onclick="syncToGoogleDrive()" title="Sync to Google Drive">
+                        <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
+                        </svg>
+                        Sync Drive
+                    </button>
+                    <button class="btn-backup" onclick="exportAllData()" title="Export All Chapters">
+                        <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                        Export All
+                    </button>
+                    <button class="btn-backup" onclick="importData()" title="Import Chapters">
+                        <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                        </svg>
+                        Import
+                    </button>
+                </div>
+                
+                <div class="auto-sync-toggle">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="autoSyncToggle" onchange="toggleAutoSync(this.checked)">
+                        <span class="toggle-text">Auto-sync to Drive</span>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="add-chapter-section">
+                <div class="section-title">New Chapter</div>
+                <div class="input-wrapper">
+                    <svg class="input-icon icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                    </svg>
+                    <input type="text" id="chapterInput" placeholder="Enter chapter name...">
+                </div>
+                <button class="btn btn-primary" onclick="addChapter()">
+                    <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Add Chapter
+                </button>
+            </div>
+            
+            <div class="chapters-section">
+                <div class="section-title">Your Chapters</div>
+                <div class="chapters-list" id="chaptersList"></div>
+            </div>
+            
+            <div class="sidebar-footer">
+                <div class="author-info">
+                    <div class="author-label">Created by</div>
+                    <div class="author-name">Gourav Saini (Hiroshi)</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="content-area" id="contentArea">
+            <div class="empty-state">
+                <svg class="icon-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <h3>No chapter selected</h3>
+                <p>Create a new chapter or select an existing one to get started</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal" id="imageModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-counter" id="modalCounter"></div>
+                <button class="modal-close" onclick="closeImageModal()">
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-image-container">
+                <button class="modal-nav modal-nav-left" onclick="navigateImage(-1)">
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                </button>
+                <img id="modalImage" class="modal-image" alt="Question">
+                <button class="modal-nav modal-nav-right" onclick="navigateImage(1)">
+                    <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-hint">← → Arrow keys to navigate • ESC to close</div>
+        </div>
+    </div>
+    
+    <input type="file" id="fileInput" accept="image/*" multiple>
+    <input type="file" id="importInput" accept=".json" style="display: none;">
+    
+    <!-- Google Drive API -->
+    <script src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+    <script src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+    
+    <script>
+        // Google Drive Configuration
+        const GOOGLE_CLIENT_ID = '248764468426-rtntbe65ipmg6ugud186nok0jjl1dgeb.apps.googleusercontent.com';
+        const GOOGLE_API_KEY = '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';
+        const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"];
+        const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+        
+        let gapiInited = false;
+        let gisInited = false;
+        let tokenClient;
+        let accessToken = null;
+        let driveFileId = localStorage.getItem('driveFileId') || null;
+        let autoSyncEnabled = localStorage.getItem('autoSyncEnabled') === 'true';
+        
+        let chapters = JSON.parse(localStorage.getItem('chapters')) || [];
+        let currentChapter = null;
+        let currentImageIndex = -1;
+        
+        function saveData() {
+            localStorage.setItem('chapters', JSON.stringify(chapters));
+            
+            // Auto-sync to Google Drive if enabled
+            if (autoSyncEnabled && accessToken && driveFileId) {
+                uploadToGoogleDrive();
+            }
+        }
+        
+        function toggleAutoSync(enabled) {
+            autoSyncEnabled = enabled;
+            localStorage.setItem('autoSyncEnabled', enabled);
+            
+            if (enabled) {
+                if (!accessToken) {
+                    // Authenticate first
+                    syncToGoogleDrive();
+                } else {
+                    showToast('Auto-sync enabled!', 'success');
+                }
+            } else {
+                showToast('Auto-sync disabled', 'info');
+            }
+        }
+        
+        function renderChapters() {
+            const chaptersList = document.getElementById('chaptersList');
+            chaptersList.innerHTML = '';
+            
+            if (chapters.length === 0) {
+                chaptersList.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.875rem; text-align: center; padding: 20px;">No chapters yet</p>';
+                return;
+            }
+            
+            chapters.forEach((chapter, index) => {
+                const chapterItem = document.createElement('div');
+                chapterItem.className = 'chapter-item' + (currentChapter === index ? ' active' : '');
+                chapterItem.onclick = () => selectChapter(index);
+                
+                chapterItem.innerHTML = `
+                    <div class="chapter-info">
+                        <div class="chapter-name">${chapter.name}</div>
+                        <div class="chapter-count">
+                            <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                            ${chapter.questions.length} questions
+                        </div>
+                    </div>
+                    <div class="chapter-actions-group">
+                        <button class="btn-icon" onclick="exportChapter(event, ${index})" title="Export Chapter">
+                            <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                            </svg>
+                        </button>
+                        <button class="btn-icon" onclick="deleteChapter(event, ${index})" title="Delete Chapter">
+                            <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                        </button>
+                    </div>
+                `;
+                
+                chaptersList.appendChild(chapterItem);
+            });
+        }
+        
+        function addChapter() {
+            const input = document.getElementById('chapterInput');
+            const chapterName = input.value.trim();
+            
+            if (!chapterName) {
+                showToast('Please enter a chapter name!', 'error');
+                return;
+            }
+            
+            chapters.push({
+                name: chapterName,
+                questions: []
+            });
+            
+            saveData();
+            renderChapters();
+            input.value = '';
+            showToast('Chapter added successfully!', 'success');
+            selectChapter(chapters.length - 1);
+        }
+        
+        function deleteChapter(event, index) {
+            event.stopPropagation();
+            
+            if (confirm('Are you sure you want to delete this chapter?')) {
+                chapters.splice(index, 1);
+                saveData();
+                renderChapters();
+                
+                if (currentChapter === index) {
+                    currentChapter = null;
+                    renderContent();
+                }
+                
+                showToast('Chapter deleted successfully!', 'success');
+            }
+        }
+        
+        function selectChapter(index) {
+            currentChapter = index;
+            renderChapters();
+            renderContent();
+        }
+        
+        function renderContent() {
+            const contentArea = document.getElementById('contentArea');
+            
+            if (currentChapter === null) {
+                contentArea.innerHTML = `
+                    <div class="empty-state">
+                        <svg class="icon-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <h3>No chapter selected</h3>
+                        <p>Create a new chapter or select an existing one to get started</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            const chapter = chapters[currentChapter];
+            
+            contentArea.innerHTML = `
+                <div class="chapter-header">
+                    <h2 class="chapter-title">${chapter.name}</h2>
+                    <div class="chapter-actions">
+                        <button class="btn btn-success" onclick="exportPDF()">
+                            <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            Export PDF
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="upload-area" id="uploadArea">
+                    <svg class="upload-icon icon-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                    <div class="upload-text">Drag & drop images here</div>
+                    <div class="upload-subtext">Or click to select • Ctrl+V to paste</div>
+                </div>
+                
+                <div class="questions-grid" id="questionsGrid"></div>
+            `;
+            
+            setupUploadArea();
+            renderQuestions();
+        }
+        
+        function setupUploadArea() {
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+            
+            uploadArea.onclick = () => fileInput.click();
+            
+            uploadArea.ondragover = (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            };
+            
+            uploadArea.ondragleave = () => {
+                uploadArea.classList.remove('dragover');
+            };
+            
+            uploadArea.ondrop = (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                handleFiles(e.dataTransfer.files);
+            };
+            
+            fileInput.onchange = (e) => {
+                handleFiles(e.target.files);
+                fileInput.value = '';
+            };
+            
+            document.addEventListener('paste', (e) => {
+                if (currentChapter === null) return;
+                
+                const items = e.clipboardData.items;
+                for (let item of items) {
+                    if (item.type.indexOf('image') !== -1) {
+                        const blob = item.getAsFile();
+                        handleFiles([blob]);
+                    }
+                }
+            });
+        }
+        
+        function handleFiles(files) {
+            if (!files || files.length === 0) return;
+            
+            Array.from(files).forEach(file => {
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        chapters[currentChapter].questions.push({
+                            image: e.target.result,
+                            timestamp: Date.now()
+                        });
+                        saveData();
+                        renderQuestions();
+                        renderChapters();
+                        showToast('Question added successfully!', 'success');
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+        
+        function renderQuestions() {
+            const questionsGrid = document.getElementById('questionsGrid');
+            const chapter = chapters[currentChapter];
+            
+            if (!chapter || chapter.questions.length === 0) {
+                questionsGrid.innerHTML = `
+                    <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);">
+                        <svg style="width: 48px; height: 48px; margin: 0 auto 16px; opacity: 0.3;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                        <p>No questions yet</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            questionsGrid.innerHTML = '';
+            
+            chapter.questions.forEach((question, index) => {
+                const questionCard = document.createElement('div');
+                questionCard.className = 'question-card';
+                questionCard.draggable = true;
+                questionCard.dataset.index = index;
+                
+                // Drag events
+                questionCard.ondragstart = (e) => {
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', index);
+                    questionCard.classList.add('dragging');
+                };
+                
+                questionCard.ondragend = (e) => {
+                    questionCard.classList.remove('dragging');
+                };
+                
+                questionCard.ondragover = (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    questionCard.classList.add('drag-over');
+                };
+                
+                questionCard.ondragleave = (e) => {
+                    questionCard.classList.remove('drag-over');
+                };
+                
+                questionCard.ondrop = (e) => {
+                    e.preventDefault();
+                    questionCard.classList.remove('drag-over');
+                    
+                    const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+                    const toIndex = parseInt(questionCard.dataset.index);
+                    
+                    if (fromIndex !== toIndex) {
+                        reorderQuestion(fromIndex, toIndex);
+                    }
+                };
+                
+                questionCard.innerHTML = `
+                    <div class="question-number">Q${index + 1}</div>
+                    <div class="drag-handle" title="Drag to reorder">
+                        <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/>
+                        </svg>
+                    </div>
+                    <img src="${question.image}" class="question-image" alt="Question ${index + 1}" onclick="viewImage('${question.image}')">
+                    <div class="question-actions">
+                        <div class="reorder-buttons">
+                            <button class="btn-icon-small" onclick="moveQuestion(${index}, 'up')" title="Move Up" ${index === 0 ? 'disabled' : ''}>
+                                <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+                                </svg>
+                            </button>
+                            <button class="btn-icon-small" onclick="moveQuestion(${index}, 'down')" title="Move Down" ${index === chapter.questions.length - 1 ? 'disabled' : ''}>
+                                <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <button class="btn-icon" onclick="deleteQuestion(${index})" title="Delete Question">
+                            <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                        </button>
+                    </div>
+                `;
+                
+                questionsGrid.appendChild(questionCard);
+            });
+        }
+        
+        function deleteQuestion(index) {
+            if (confirm('Are you sure you want to delete this question?')) {
+                chapters[currentChapter].questions.splice(index, 1);
+                saveData();
+                renderQuestions();
+                renderChapters();
+                showToast('Question deleted successfully!', 'success');
+            }
+        }
+        
+        // Move question using buttons
+        function moveQuestion(index, direction) {
+            const chapter = chapters[currentChapter];
+            
+            if (direction === 'up' && index > 0) {
+                // Swap with previous
+                [chapter.questions[index], chapter.questions[index - 1]] = 
+                [chapter.questions[index - 1], chapter.questions[index]];
+                showToast('Question moved up!', 'success');
+            } else if (direction === 'down' && index < chapter.questions.length - 1) {
+                // Swap with next
+                [chapter.questions[index], chapter.questions[index + 1]] = 
+                [chapter.questions[index + 1], chapter.questions[index]];
+                showToast('Question moved down!', 'success');
+            }
+            
+            saveData();
+            renderQuestions();
+        }
+        
+        // Reorder question using drag and drop
+        function reorderQuestion(fromIndex, toIndex) {
+            const chapter = chapters[currentChapter];
+            const movedQuestion = chapter.questions.splice(fromIndex, 1)[0];
+            chapter.questions.splice(toIndex, 0, movedQuestion);
+            
+            saveData();
+            renderQuestions();
+            showToast(`Question moved from Q${fromIndex + 1} to Q${toIndex + 1}!`, 'success');
+        }
+        
+        // Export single chapter
+        function exportChapter(event, index) {
+            event.stopPropagation();
+            
+            const chapter = chapters[index];
+            const exportData = {
+                appName: 'Lecture Notes Manager',
+                author: 'Gourav Saini (Hiroshi)',
+                version: '1.0',
+                exportDate: new Date().toISOString(),
+                exportType: 'single-chapter',
+                chapter: chapter
+            };
+            
+            const dataStr = JSON.stringify(exportData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${chapter.name.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            showToast('Chapter exported successfully!', 'success');
+        }
+        
+        // Export all chapters
+        function exportAllData() {
+            if (chapters.length === 0) {
+                showToast('No chapters to export!', 'error');
+                return;
+            }
+            
+            const exportData = {
+                appName: 'Lecture Notes Manager',
+                author: 'Gourav Saini (Hiroshi)',
+                version: '1.0',
+                exportDate: new Date().toISOString(),
+                exportType: 'full-backup',
+                totalChapters: chapters.length,
+                chapters: chapters
+            };
+            
+            const dataStr = JSON.stringify(exportData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `NotesOrganizer_Backup_${Date.now()}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            
+            showToast(`${chapters.length} chapters exported successfully!`, 'success');
+        }
+        
+        // Import data
+        function importData() {
+            const importInput = document.getElementById('importInput');
+            importInput.click();
+            
+            importInput.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const importedData = JSON.parse(event.target.result);
+                        
+                        // Check if it's a single chapter or full backup
+                        if (importedData.chapters && Array.isArray(importedData.chapters)) {
+                            // Full backup import
+                            const confirmMsg = `This backup contains ${importedData.totalChapters} chapters.\nDo you want to merge with existing chapters?\n\nOK = Merge\nCancel = Replace`;
+                            
+                            if (confirm(confirmMsg)) {
+                                // Merge: Add imported chapters to existing
+                                importedData.chapters.forEach(chapter => {
+                                    chapters.push(chapter);
+                                });
+                                showToast(`${importedData.totalChapters} chapters merged successfully!`, 'success');
+                            } else {
+                                // Replace: Overwrite all chapters
+                                chapters = importedData.chapters;
+                                showToast(`${importedData.totalChapters} chapters imported successfully!`, 'success');
+                            }
+                        } else if (importedData.chapter && importedData.chapter.name && importedData.chapter.questions) {
+                            // New format single chapter import
+                            chapters.push(importedData.chapter);
+                            showToast(`Chapter "${importedData.chapter.name}" imported successfully!`, 'success');
+                        } else if (importedData.name && importedData.questions) {
+                            // Old format single chapter import (backward compatibility)
+                            chapters.push(importedData);
+                            showToast(`Chapter "${importedData.name}" imported successfully!`, 'success');
+                        } else {
+                            throw new Error('Invalid file format');
+                        }
+                        
+                        saveData();
+                        renderChapters();
+                        currentChapter = null;
+                        renderContent();
+                        
+                    } catch (error) {
+                        showToast('Invalid file! Please select a valid backup file.', 'error');
+                        console.error('Import error:', error);
+                    }
+                };
+                
+                reader.readAsText(file);
+                importInput.value = '';
+            };
+        }
+        
+        // Google Drive Integration
+        function gapiLoaded() {
+            gapi.load('client', initializeGapiClient);
+        }
+        
+        async function initializeGapiClient() {
+            try {
+                await gapi.client.init({
+                    apiKey: GOOGLE_API_KEY,
+                    discoveryDocs: DISCOVERY_DOCS,
+                });
+                gapiInited = true;
+                console.log('GAPI initialized successfully');
+            } catch (error) {
+                console.error('Error initializing GAPI:', error);
+                showToast('Failed to initialize Google Drive API', 'error');
+            }
+        }
+        
+        function gisLoaded() {
+            try {
+                tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: GOOGLE_CLIENT_ID,
+                    scope: SCOPES,
+                    callback: '', // Will be set when sync is called
+                });
+                gisInited = true;
+                console.log('GIS initialized successfully');
+            } catch (error) {
+                console.error('Error initializing GIS:', error);
+                showToast('Failed to initialize Google authentication', 'error');
+            }
+        }
+        
+        function syncToGoogleDrive() {
+            if (GOOGLE_API_KEY === 'YOUR_API_KEY_HERE') {
+                showGoogleDriveSetupModal();
+                return;
+            }
+            
+            if (chapters.length === 0) {
+                showToast('No chapters to sync!', 'error');
+                return;
+            }
+            
+            // Check if Google APIs are loaded
+            if (!gapiInited || !gisInited) {
+                showToast('Google Drive is still loading... Please try again in a moment.', 'info');
+                return;
+            }
+            
+            if (!tokenClient) {
+                showToast('Google authentication not initialized. Please refresh the page.', 'error');
+                return;
+            }
+            
+            tokenClient.callback = async (resp) => {
+                if (resp.error !== undefined) {
+                    console.error('Auth error:', resp);
+                    showToast('Authentication failed. Please try again.', 'error');
+                    return;
+                }
+                accessToken = gapi.client.getToken().access_token;
+                await uploadToGoogleDrive();
+            };
+            
+            if (gapi.client.getToken() === null) {
+                tokenClient.requestAccessToken({prompt: 'consent'});
+            } else {
+                tokenClient.requestAccessToken({prompt: ''});
+            }
+        }
+        
+        async function uploadToGoogleDrive() {
+            try {
+                showToast('Syncing to Google Drive...', 'info');
+                
+                const exportData = {
+                    appName: 'Lecture Notes Manager',
+                    author: 'Gourav Saini (Hiroshi)',
+                    version: '1.0',
+                    exportDate: new Date().toISOString(),
+                    exportType: 'google-drive-sync',
+                    totalChapters: chapters.length,
+                    chapters: chapters
+                };
+                
+                const fileContent = JSON.stringify(exportData, null, 2);
+                const file = new Blob([fileContent], {type: 'application/json'});
+                const metadata = {
+                    name: 'LectureNotes_Backup.json',
+                    mimeType: 'application/json',
+                };
+                
+                const form = new FormData();
+                form.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
+                form.append('file', file);
+                
+                let response;
+                if (driveFileId) {
+                    // Update existing file
+                    response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=multipart`, {
+                        method: 'PATCH',
+                        headers: new Headers({'Authorization': 'Bearer ' + accessToken}),
+                        body: form,
+                    });
+                } else {
+                    // Create new file
+                    response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                        method: 'POST',
+                        headers: new Headers({'Authorization': 'Bearer ' + accessToken}),
+                        body: form,
+                    });
+                }
+                
+                const result = await response.json();
+                if (result.id) {
+                    driveFileId = result.id;
+                    localStorage.setItem('driveFileId', driveFileId);
+                    showToast('Successfully synced to Google Drive!', 'success');
+                } else {
+                    throw new Error('Failed to sync');
+                }
+            } catch (error) {
+                console.error('Drive sync error:', error);
+                showToast('Failed to sync to Google Drive', 'error');
+            }
+        }
+        
+        function showGoogleDriveSetupModal() {
+            const modal = document.createElement('div');
+            modal.className = 'modal active';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 600px; padding: 32px;">
+                    <h2 style="margin-bottom: 16px; color: var(--text-primary);">Google API Key Required</h2>
+                    <p style="color: var(--text-secondary); margin-bottom: 24px; line-height: 1.6;">
+                        Client ID is already configured! You just need to add your Google API Key.
+                    </p>
+                    <ol style="color: var(--text-secondary); line-height: 2; margin-bottom: 24px; padding-left: 20px;">
+                        <li>Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color: var(--primary);">Google Cloud Console - Credentials</a></li>
+                        <li>Click "CREATE CREDENTIALS" → "API Key"</li>
+                        <li>Copy the API Key</li>
+                        <li>Edit this HTML file and replace <code style="background: var(--bg-main); padding: 2px 6px; border-radius: 4px;">YOUR_API_KEY_HERE</code> with your actual API Key</li>
+                        <li>Make sure Google Drive API is enabled in your project</li>
+                    </ol>
+                    <div style="background: var(--primary-light); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+                        <div style="font-size: 0.875rem; font-weight: 600; color: var(--primary); margin-bottom: 8px;">Quick Steps:</div>
+                        <div style="font-size: 0.875rem; color: var(--text-secondary); line-height: 1.6;">
+                            1. Create API Key in Google Cloud Console<br>
+                            2. Find line: <code style="background: white; padding: 2px 6px; border-radius: 4px;">const GOOGLE_API_KEY = 'YOUR_API_KEY_HERE';</code><br>
+                            3. Replace with: <code style="background: white; padding: 2px 6px; border-radius: 4px;">const GOOGLE_API_KEY = 'AIza...';</code>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                        <button class="btn btn-primary" onclick="this.closest('.modal').remove()">Got it!</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            modal.onclick = (e) => {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            };
+        }
+        
+        // Initialize Google APIs when loaded
+        window.gapiLoaded = gapiLoaded;
+        window.gisLoaded = gisLoaded;
+        
+        // Check if APIs loaded after page load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                if (!gapiInited || !gisInited) {
+                    console.warn('Google APIs are still loading. Sync button will work once loaded.');
+                }
+            }, 3000);
+        });
+        
+        function viewImage(imageSrc) {
+            const modal = document.getElementById('imageModal');
+            const modalImage = document.getElementById('modalImage');
+            const modalCounter = document.getElementById('modalCounter');
+            const chapter = chapters[currentChapter];
+            
+            // Find the index of the current image
+            currentImageIndex = chapter.questions.findIndex(q => q.image === imageSrc);
+            
+            modalImage.src = imageSrc;
+            modalCounter.textContent = `Question ${currentImageIndex + 1} of ${chapter.questions.length}`;
+            modal.classList.add('active');
+            
+            modal.onclick = (e) => {
+                if (e.target === modal) {
+                    closeImageModal();
+                }
+            };
+            
+            // Add keyboard navigation
+            document.addEventListener('keydown', handleImageNavigation);
+        }
+        
+        function navigateImage(direction) {
+            if (currentImageIndex === -1 || currentChapter === null) return;
+            
+            const chapter = chapters[currentChapter];
+            const modalImage = document.getElementById('modalImage');
+            const modalCounter = document.getElementById('modalCounter');
+            
+            // Calculate new index with wrapping
+            currentImageIndex = (currentImageIndex + direction + chapter.questions.length) % chapter.questions.length;
+            
+            // Update image and counter
+            modalImage.src = chapter.questions[currentImageIndex].image;
+            modalCounter.textContent = `Question ${currentImageIndex + 1} of ${chapter.questions.length}`;
+        }
+        
+        function closeImageModal() {
+            const modal = document.getElementById('imageModal');
+            modal.classList.remove('active');
+            currentImageIndex = -1;
+            document.removeEventListener('keydown', handleImageNavigation);
+        }
+        
+        function handleImageNavigation(e) {
+            if (currentImageIndex === -1 || currentChapter === null) return;
+            
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                navigateImage(1); // Next image
+            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                navigateImage(-1); // Previous image
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                closeImageModal();
+            }
+        }
+        
+        async function exportPDF() {
+            const chapter = chapters[currentChapter];
+            
+            if (chapter.questions.length === 0) {
+                showToast('No questions to export!', 'error');
+                return;
+            }
+            
+            showToast('Generating PDF...', 'info');
+            
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            const margin = 20;
+            const contentWidth = pageWidth - (2 * margin);
+            
+            // Title page with better design
+            pdf.setFillColor(79, 70, 229);
+            pdf.rect(0, 0, pageWidth, 60, 'F');
+            
+            pdf.setTextColor(255, 255, 255);
+            pdf.setFontSize(28);
+            pdf.setFont(undefined, 'bold');
+            pdf.text(chapter.name, pageWidth / 2, 35, { align: 'center' });
+            
+            pdf.setFontSize(12);
+            pdf.setFont(undefined, 'normal');
+            pdf.text(`${chapter.questions.length} Questions`, pageWidth / 2, 48, { align: 'center' });
+            
+            pdf.setTextColor(100, 100, 100);
+            pdf.setFontSize(9);
+            pdf.text(`Generated on ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}`, pageWidth / 2, 75, { align: 'center' });
+            
+            // Author credit on title page
+            pdf.setFontSize(8);
+            pdf.setTextColor(150, 150, 150);
+            pdf.text('Created with Lecture Notes Manager', pageWidth / 2, pageHeight - 25, { align: 'center' });
+            pdf.setFontSize(9);
+            pdf.setTextColor(79, 70, 229);
+            pdf.text('by Gourav Saini (Hiroshi)', pageWidth / 2, pageHeight - 18, { align: 'center' });
+            
+            // Start questions on new page
+            pdf.addPage();
+            
+            let currentY = margin;
+            const questionSpacing = 8;
+            const imageMaxHeight = 100; // Maximum height for each image in mm
+            
+            for (let i = 0; i < chapter.questions.length; i++) {
+                const img = new Image();
+                img.src = chapter.questions[i].image;
+                
+                await new Promise((resolve) => {
+                    img.onload = () => {
+                        // Calculate image dimensions
+                        const imgWidth = img.width;
+                        const imgHeight = img.height;
+                        const aspectRatio = imgWidth / imgHeight;
+                        
+                        // Calculate final dimensions
+                        let finalWidth = contentWidth;
+                        let finalHeight = finalWidth / aspectRatio;
+                        
+                        // If height is too much, scale down based on height
+                        if (finalHeight > imageMaxHeight) {
+                            finalHeight = imageMaxHeight;
+                            finalWidth = finalHeight * aspectRatio;
+                        }
+                        
+                        const questionNumberHeight = 12;
+                        const totalHeight = questionNumberHeight + finalHeight + questionSpacing;
+                        
+                        // Check if we need a new page
+                        if (currentY + totalHeight > pageHeight - margin) {
+                            pdf.addPage();
+                            currentY = margin;
+                        }
+                        
+                        // Add question number with background
+                        pdf.setFillColor(79, 70, 229);
+                        pdf.roundedRect(margin, currentY, 20, 8, 2, 2, 'F');
+                        pdf.setTextColor(255, 255, 255);
+                        pdf.setFontSize(10);
+                        pdf.setFont(undefined, 'bold');
+                        pdf.text(`Q${i + 1}`, margin + 10, currentY + 5.5, { align: 'center' });
+                        
+                        // Add image with border
+                        const imageX = margin + (contentWidth - finalWidth) / 2;
+                        const imageY = currentY + questionNumberHeight;
+                        
+                        // Add subtle border around image
+                        pdf.setDrawColor(230, 230, 230);
+                        pdf.setLineWidth(0.5);
+                        pdf.rect(imageX - 2, imageY - 2, finalWidth + 4, finalHeight + 4);
+                        
+                        pdf.addImage(img, 'JPEG', imageX, imageY, finalWidth, finalHeight);
+                        
+                        currentY += totalHeight;
+                        
+                        // Add a separator line between questions (except after last question)
+                        if (i < chapter.questions.length - 1 && currentY < pageHeight - margin - 20) {
+                            pdf.setDrawColor(220, 220, 220);
+                            pdf.setLineWidth(0.3);
+                            pdf.line(margin + 10, currentY - questionSpacing/2, pageWidth - margin - 10, currentY - questionSpacing/2);
+                        }
+                        
+                        resolve();
+                    };
+                    
+                    img.onerror = () => {
+                        console.error(`Failed to load image ${i + 1}`);
+                        resolve();
+                    };
+                });
+            }
+            
+            // Add page numbers to all pages except title page
+            const totalPages = pdf.internal.getNumberOfPages();
+            pdf.setFontSize(9);
+            pdf.setTextColor(150, 150, 150);
+            
+            for (let i = 2; i <= totalPages; i++) {
+                pdf.setPage(i);
+                pdf.text(`Page ${i - 1} of ${totalPages - 1}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+            }
+            
+            pdf.save(`${chapter.name.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.pdf`);
+            showToast('PDF successfully downloaded!', 'success');
+        }
+        
+        function showToast(message, type = 'success') {
+            const existingToast = document.querySelector('.toast');
+            if (existingToast) {
+                existingToast.remove();
+            }
+            
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            
+            let icon = '';
+            if (type === 'success') {
+                icon = '<svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+            } else if (type === 'error') {
+                icon = '<svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+            } else {
+                icon = '<svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
+            }
+            
+            toast.innerHTML = icon + '<span>' + message + '</span>';
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+        
+        // Initialize
+        renderChapters();
+        
+        // Set auto-sync checkbox state
+        const autoSyncToggle = document.getElementById('autoSyncToggle');
+        if (autoSyncToggle) {
+            autoSyncToggle.checked = autoSyncEnabled;
+        }
+        
+        // Enter key support
+        document.getElementById('chapterInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                addChapter();
+            }
+        });
+    </script>
+</body>
+</html>
