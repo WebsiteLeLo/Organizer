@@ -1830,18 +1830,6 @@
                 handleFiles(e.target.files);
                 fileInput.value = '';
             };
-            
-            document.addEventListener('paste', (e) => {
-                if (currentChapter === null) return;
-                
-                const items = e.clipboardData.items;
-                for (let item of items) {
-                    if (item.type.indexOf('image') !== -1) {
-                        const blob = item.getAsFile();
-                        handleFiles([blob]);
-                    }
-                }
-            });
         }
         
         function handleFiles(files) {
@@ -3273,6 +3261,21 @@
         if (autoSyncToggle) {
             autoSyncToggle.checked = autoSyncEnabled;
         }
+        
+        // Setup global paste event listener (only once)
+        document.addEventListener('paste', (e) => {
+            if (currentChapter === null) return;
+            
+            const items = e.clipboardData.items;
+            for (let item of items) {
+                if (item.type.indexOf('image') !== -1) {
+                    e.preventDefault(); // Prevent default paste behavior
+                    const blob = item.getAsFile();
+                    handleFiles([blob]);
+                    break; // Only handle first image
+                }
+            }
+        });
         
         // Restore user profile if exists
         setTimeout(() => {
