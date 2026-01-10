@@ -2385,10 +2385,10 @@
         }
         
         function syncToGoogleDrive() {
-            if (chapters.length === 0 && !driveFileId) {
-                showToast('No chapters to sync!', 'error');
-                return;
-            }
+            // Allow sign-in even with no chapters - we might want to load from Drive
+            console.log('🔄 syncToGoogleDrive called');
+            console.log('Chapters count:', chapters.length);
+            console.log('Drive file ID:', driveFileId);
             
             // Check if Google APIs are loaded
             if (!gapiInited || !gisInited) {
@@ -2412,14 +2412,158 @@
                     console.log('🔄 Drive file exists, loading before sync...');
                     loadAndMergeFromDrive();
                 } else {
-                    // No Drive file, just upload
-                    uploadToGoogleDrive();
+                    // Search for existing file or upload if we have chapters
+                    console.log('🔍 Searching for existing Drive file...');
+                    searchAndLoadOrUpload();
                 }
                 return;
             }
             
-            // Need to get a new token
-            tokenClient.callback = async (resp) => {
+            // Need to get a new token - this will trigger sign-in
+            console.log('🔐 Requesting new token (sign-in)...');
+            tokenClient.callback = handleAuthCallback;
+            
+            // Request token with prompt='none' to avoid popup if already authenticated
+            try {
+                tokenClient.requestAccessToken({prompt: ''});
+            } catch (error) {
+                // If silent auth fails, show consent screen
+                tokenClient.requestAccessToken({prompt: 'consent'});
+            }
+        }
+        
+        async function searchAndLoadOrUpload() {
+            const existingFileId = await searchForDriveFile();
+            
+            if (existingFileId) {
+                console.log('✅ Found existing Drive file:', existingFileId);
+                driveFileId = existingFileId;
+                localStorage.setItem('driveFileId', driveFileId);
+                await loadAndMergeFromDrive();
+            } else if (chapters.length > 0) {
+                // No existing file but we have chapters, upload them
+                console.log('📤 No existing Drive file, uploading current data...');
+                await uploadToGoogleDrive();
+            } else {
+                // No file in Drive and no local chapters
+                console.log('✅ Signed in successfully! No data to sync yet.');
+                showToast('Signed in successfully! Add questions to start syncing.', 'success');
+            }
+        }
+        
+        async function handleAuthCallback(resp) {
+                console.log('🔐 Token callback triggered');
+                console.log('Response:', resp);
+                
+                if (resp.error !== undefined) {
+                    console.error('❌ Auth error:', resp);
+                    showToast('Authentication failed. Please try again.', 'error');
+                    return;
+                }
+                
+                console.log('✅ No error in response');
+                
+                const token = gapi.client.getToken();
+                console.log('🎫 Token from gapi.client:', token);
+                
+                accessToken = token.access_token;
+                console.log('✅ accessToken set:', accessToken ? 'Yes' : 'No');
+                
+                // Store token with expiration time (tokens typically last 1 hour = 3600 seconds)
+                const tokenWithExpiry = {
+                    ...token,
+                    expires_at: Date.now() + (3600 * 1000) // 1 hour from now
+                };
+                localStorage.setItem('gapi_token', JSON.stringify(tokenWithExpiry));
+                console.log('✅ Token stored in localStorage');
+                
+                // Extract user info - use gapi.client.request for proper authentication
+                let userEmail = '';
+                let userName = '';
+                
+                console.log('👤 Extracting user info...');
+                
+                try {
+                    console.log('🔍 Using gapi.client.request for user info...');
+                    
+                    // Load the oauth2 API
+                    await gapi.client.load('oauth2', 'v2');
+                    
+                    // Get user info using gapi client
+                    const userInfoResponse = await gapi.client.oauth2.userinfo.get();
+                    console.log('✅ Got user info:', userInfoResponse.result);
+                    
+                    userEmail = userInfoResponse.result.email || '';
+                    userName = userInfoResponse.result.name || userInfoResponse.result.given_name || '';
+                    
+                } catch (e) {
+                    console.log('⚠️ Could not fetch user info via gapi, trying fallback:', e);
+                    
+                    // Fallback: try direct fetch
+                    try {
+                        const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+                            headers: { 'Authorization': `Bearer ${accessToken}` }
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            userEmail = data.email || '';
+                            userName = data.name || '';
+                            console.log('✅ Got user info from direct fetch:', data);
+                        }
+                    } catch (e2) {
+                        console.log('⚠️ All methods failed, using token hint');
+                        // Last resort: use token hint or default
+                        userEmail = token.login_hint || 'user@gmail.com';
+                        userName = userEmail.split('@')[0];
+                    }
+                }
+                
+                const userInfo = {
+                    email: userEmail,
+                    name: userName
+                };
+                
+                localStorage.setItem('userInfo', JSON.stringify(userInfo));
+                console.log('👤 User info stored in localStorage:', userInfo);
+                
+                // Update UI immediately (with delay to ensure DOM is ready)
+                console.log('🎨 Calling updateUserProfile...');
+                setTimeout(() => {
+                    updateUserProfile(userInfo);
+                }, 500);
+                
+                // After authentication, check if Drive file exists
+                console.log('💾 Checking for Drive file...');
+                console.log('Current driveFileId:', driveFileId);
+                
+                if (driveFileId) {
+                    console.log('🔄 Drive file ID exists, loading from Drive...');
+                    await loadAndMergeFromDrive();
+                } else {
+                    // Search for existing Drive file
+                    console.log('🔍 No stored file ID, searching for existing Drive file...');
+                    const existingFileId = await searchForDriveFile();
+                    
+                    console.log('Search result:', existingFileId);
+                    
+                    if (existingFileId) {
+                        console.log('✅ Found existing Drive file:', existingFileId);
+                        driveFileId = existingFileId;
+                        localStorage.setItem('driveFileId', driveFileId);
+                        await loadAndMergeFromDrive();
+                    } else {
+                        // No existing file, upload current data if we have chapters
+                        if (chapters.length > 0) {
+                            console.log('📤 No existing Drive file, uploading current data...');
+                            await uploadToGoogleDrive();
+                        } else {
+                            console.log('✅ Signed in successfully! No data to sync yet.');
+                            showToast('✅ Signed in successfully! Add questions to start syncing.', 'success');
+                        }
+                    }
+                }
+            }
                 console.log('🔐 Token callback triggered');
                 console.log('Response:', resp);
                 
