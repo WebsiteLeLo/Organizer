@@ -2318,14 +2318,22 @@
             
             // Need to get a new token
             tokenClient.callback = async (resp) => {
+                console.log('🔐 Token callback triggered');
+                console.log('Response:', resp);
+                
                 if (resp.error !== undefined) {
-                    console.error('Auth error:', resp);
+                    console.error('❌ Auth error:', resp);
                     showToast('Authentication failed. Please try again.', 'error');
                     return;
                 }
                 
+                console.log('✅ No error in response');
+                
                 const token = gapi.client.getToken();
+                console.log('🎫 Token from gapi.client:', token);
+                
                 accessToken = token.access_token;
+                console.log('✅ accessToken set:', accessToken ? 'Yes' : 'No');
                 
                 // Store token with expiration time (tokens typically last 1 hour = 3600 seconds)
                 const tokenWithExpiry = {
@@ -2333,36 +2341,45 @@
                     expires_at: Date.now() + (3600 * 1000) // 1 hour from now
                 };
                 localStorage.setItem('gapi_token', JSON.stringify(tokenWithExpiry));
-                console.log('✅ Token stored for future use');
+                console.log('✅ Token stored in localStorage');
                 
                 // Extract user info from token - trying multiple methods
                 let userEmail = '';
                 let userName = '';
                 
+                console.log('👤 Extracting user info...');
+                
                 // Try to get from token hints
                 if (token.login_hint) {
                     userEmail = token.login_hint;
                     userName = userEmail.split('@')[0];
+                    console.log('✅ Got user info from token.login_hint:', {userEmail, userName});
                 } else if (resp.scope) {
                     // Try to extract from response
                     userEmail = 'user@gmail.com';
                     userName = 'User';
+                    console.log('⚠️ Using fallback user info');
                 }
                 
                 // Try to get actual user info from Google People API
                 try {
+                    console.log('🔍 Fetching user info from Google API...');
                     const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
                         headers: { 'Authorization': `Bearer ${accessToken}` }
                     });
+                    
+                    console.log('User info response status:', userInfoResponse.status);
                     
                     if (userInfoResponse.ok) {
                         const userData = await userInfoResponse.json();
                         userEmail = userData.email || userEmail;
                         userName = userData.name || userData.given_name || userName;
-                        console.log('✅ Got user info from Google:', userData);
+                        console.log('✅ Got user info from Google API:', userData);
+                    } else {
+                        console.log('⚠️ User info response not OK:', userInfoResponse.status);
                     }
                 } catch (e) {
-                    console.log('Could not fetch user info, using fallback');
+                    console.log('⚠️ Could not fetch user info:', e);
                 }
                 
                 const userInfo = {
@@ -2371,12 +2388,16 @@
                 };
                 
                 localStorage.setItem('userInfo', JSON.stringify(userInfo));
-                console.log('👤 User info stored:', userInfo);
+                console.log('👤 User info stored in localStorage:', userInfo);
                 
                 // Update UI immediately
+                console.log('🎨 Calling updateUserProfile...');
                 updateUserProfile(userInfo);
                 
                 // After authentication, check if Drive file exists
+                console.log('💾 Checking for Drive file...');
+                console.log('Current driveFileId:', driveFileId);
+                
                 if (driveFileId) {
                     console.log('🔄 Drive file ID exists, loading from Drive...');
                     await loadAndMergeFromDrive();
@@ -2384,6 +2405,8 @@
                     // Search for existing Drive file
                     console.log('🔍 No stored file ID, searching for existing Drive file...');
                     const existingFileId = await searchForDriveFile();
+                    
+                    console.log('Search result:', existingFileId);
                     
                     if (existingFileId) {
                         console.log('✅ Found existing Drive file:', existingFileId);
@@ -2393,7 +2416,12 @@
                     } else {
                         // No existing file, upload current data
                         console.log('📤 No existing Drive file, uploading current data...');
-                        await uploadToGoogleDrive();
+                        if (chapters.length > 0) {
+                            await uploadToGoogleDrive();
+                        } else {
+                            console.log('⚠️ No chapters to upload');
+                            showToast('Signed in successfully! Add questions to sync.', 'success');
+                        }
                     }
                 }
             };
