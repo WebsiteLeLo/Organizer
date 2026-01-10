@@ -98,6 +98,10 @@
             margin-top: 16px;
         }
         
+        .backup-actions button:nth-child(5) {
+            grid-column: 1 / -1;
+        }
+        
         .btn-backup {
             flex: 1;
             padding: 8px 12px;
@@ -921,11 +925,17 @@
                         </svg>
                         Load from Drive
                     </button>
+                    <button class="btn-backup" onclick="downloadDriveFile()" title="Download Drive File">
+                        <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        Download Drive
+                    </button>
                     <button class="btn-backup" onclick="exportAllData()" title="Export All Chapters">
                         <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                         </svg>
-                        Export All
+                        Export Local
                     </button>
                     <button class="btn-backup" onclick="importData()" title="Import Chapters">
                         <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1115,6 +1125,17 @@
                 if (response.ok) {
                     const data = await response.json();
                     
+                    console.log('📥 LOADED FROM DRIVE:', {
+                        hasChapters: !!data.chapters,
+                        chaptersCount: data.chapters?.length || 0,
+                        totalChapters: data.totalChapters || 'not specified',
+                        totalQuestions: data.totalQuestions || 'not specified',
+                        questionsPerChapter: data.chapters?.map(ch => ({
+                            name: ch.name,
+                            questions: ch.questions?.length || 0
+                        })) || []
+                    });
+                    
                     if (data.chapters && Array.isArray(data.chapters)) {
                         chapters = data.chapters;
                         
@@ -1122,15 +1143,17 @@
                         try {
                             localStorage.setItem('chapters', JSON.stringify(chapters));
                         } catch (e) {
-                            console.log('Could not cache to localStorage');
+                            console.log('⚠️ Could not cache to localStorage (too large)');
                         }
                         
                         renderChapters();
                         renderContent();
                         
                         const questionCount = chapters.reduce((sum, ch) => sum + ch.questions.length, 0);
+                        console.log(`✅ RENDER COMPLETE: ${questionCount} questions in memory`);
                         showToast(`Loaded ${questionCount} questions from Google Drive!`, 'success');
                     } else {
+                        console.error('❌ Invalid data structure:', data);
                         showToast('Invalid data format in Drive', 'error');
                     }
                 } else if (response.status === 404) {
@@ -2009,11 +2032,21 @@
                 mimeType: 'application/json',
             };
             
+            // Count questions before upload
+            const totalQuestions = chapters.reduce((sum, ch) => sum + ch.questions.length, 0);
+            console.log(`📊 UPLOAD STATS:`, {
+                chapters: chapters.length,
+                totalQuestions: totalQuestions,
+                fileSize: `${(fileContent.length / (1024 * 1024)).toFixed(2)} MB`,
+                questionsPerChapter: chapters.map(ch => ({name: ch.name, questions: ch.questions.length}))
+            });
+            
             // Step 1: Initialize resumable upload
             const initUrl = driveFileId 
                 ? `https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=resumable`
                 : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable';
             
+            console.log('🔄 Initializing resumable upload...');
             const initResponse = await fetch(initUrl, {
                 method: driveFileId ? 'PATCH' : 'POST',
                 headers: {
@@ -2024,6 +2057,8 @@
             });
             
             if (!initResponse.ok) {
+                const errorText = await initResponse.text();
+                console.error('❌ Init failed:', initResponse.status, errorText);
                 throw new Error('Failed to initialize upload: ' + initResponse.status);
             }
             
@@ -2032,17 +2067,20 @@
                 throw new Error('No upload URL received');
             }
             
+            console.log('✅ Upload URL received, uploading content...');
+            
             // Step 2: Upload the file content
             const uploadResponse = await fetch(uploadUrl, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Content-Length': fileContent.length.toString(),
                 },
                 body: fileContent
             });
             
             if (!uploadResponse.ok) {
+                const errorText = await uploadResponse.text();
+                console.error('❌ Upload failed:', uploadResponse.status, errorText);
                 throw new Error('Upload failed: ' + uploadResponse.status);
             }
             
@@ -2052,10 +2090,88 @@
                 localStorage.setItem('driveFileId', driveFileId);
                 
                 const sizeMB = (fileContent.length / (1024 * 1024)).toFixed(2);
-                showToast(`Successfully synced ${sizeMB} MB to Google Drive!`, 'success');
-                console.log('Upload successful:', result);
+                console.log('✅ UPLOAD SUCCESS:', {
+                    fileId: result.id,
+                    size: `${sizeMB} MB`,
+                    chapters: chapters.length,
+                    totalQuestions: totalQuestions
+                });
+                
+                showToast(`✅ Synced ${totalQuestions} questions (${sizeMB} MB) to Drive!`, 'success');
+                
+                // VERIFICATION: Immediately load back to verify
+                setTimeout(() => {
+                    console.log('🔍 Verifying upload...');
+                    verifyDriveData();
+                }, 2000);
             } else {
                 throw new Error('Failed to sync: ' + JSON.stringify(result));
+            }
+        }
+        
+        async function verifyDriveData() {
+            try {
+                const currentToken = gapi.client.getToken();
+                if (!currentToken || !driveFileId) return;
+                
+                const response = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`, {
+                    headers: new Headers({'Authorization': 'Bearer ' + currentToken.access_token})
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const loadedQuestions = data.chapters.reduce((sum, ch) => sum + ch.questions.length, 0);
+                    
+                    console.log('🔍 VERIFICATION RESULT:', {
+                        chaptersInDrive: data.chapters.length,
+                        questionsInDrive: loadedQuestions,
+                        questionsInMemory: chapters.reduce((sum, ch) => sum + ch.questions.length, 0),
+                        match: loadedQuestions === chapters.reduce((sum, ch) => sum + ch.questions.length, 0) ? '✅ MATCH' : '❌ MISMATCH'
+                    });
+                    
+                    if (loadedQuestions !== chapters.reduce((sum, ch) => sum + ch.questions.length, 0)) {
+                        showToast('⚠️ Warning: Data verification failed! Some questions may be missing.', 'error');
+                    }
+                } else {
+                    console.log('Could not verify:', response.status);
+                }
+            } catch (error) {
+                console.error('Verification error:', error);
+            }
+        }
+        
+        async function downloadDriveFile() {
+            try {
+                const currentToken = gapi.client.getToken();
+                if (!currentToken || !driveFileId) {
+                    showToast('No Drive file to download', 'error');
+                    return;
+                }
+                
+                showToast('Downloading Drive file...', 'info');
+                
+                const response = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`, {
+                    headers: new Headers({'Authorization': 'Bearer ' + currentToken.access_token})
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `DriveBackup_${Date.now()}.json`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                    
+                    showToast('Drive file downloaded! Check the file.', 'success');
+                } else {
+                    showToast('Failed to download Drive file', 'error');
+                }
+            } catch (error) {
+                console.error('Download error:', error);
+                showToast('Error downloading Drive file', 'error');
             }
         }
         
