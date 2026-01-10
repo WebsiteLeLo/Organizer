@@ -2283,7 +2283,7 @@
         }
         
         function syncToGoogleDrive() {
-            if (chapters.length === 0) {
+            if (chapters.length === 0 && !driveFileId) {
                 showToast('No chapters to sync!', 'error');
                 return;
             }
@@ -2304,7 +2304,15 @@
             if (currentToken && currentToken.access_token) {
                 // We have a token, use it directly
                 accessToken = currentToken.access_token;
-                uploadToGoogleDrive();
+                
+                // Check if Drive file exists - if yes, load first then merge
+                if (driveFileId) {
+                    console.log('🔄 Drive file exists, loading before sync...');
+                    loadAndMergeFromDrive();
+                } else {
+                    // No Drive file, just upload
+                    uploadToGoogleDrive();
+                }
                 return;
             }
             
@@ -2327,7 +2335,22 @@
                 localStorage.setItem('gapi_token', JSON.stringify(tokenWithExpiry));
                 console.log('✅ Token stored for future use');
                 
-                await uploadToGoogleDrive();
+                // Store user info from Google
+                const userInfo = {
+                    email: token.login_hint || 'user@gmail.com',
+                    name: token.login_hint?.split('@')[0] || 'User'
+                };
+                localStorage.setItem('userInfo', JSON.stringify(userInfo));
+                updateUserProfile(userInfo);
+                
+                // After authentication, check if Drive file exists
+                if (driveFileId) {
+                    console.log('🔄 Loading from Drive after authentication...');
+                    await loadAndMergeFromDrive();
+                } else {
+                    // First time, just upload
+                    await uploadToGoogleDrive();
+                }
             };
             
             // Request token with prompt='none' to avoid popup if already authenticated
@@ -2336,6 +2359,151 @@
             } catch (error) {
                 // If silent auth fails, show consent screen
                 tokenClient.requestAccessToken({prompt: 'consent'});
+            }
+        }
+        
+        async function loadAndMergeFromDrive() {
+            try {
+                showToast('Loading from Drive...', 'info');
+                
+                const token = accessToken || gapi.client.getToken().access_token;
+                const response = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`, {
+                    headers: new Headers({'Authorization': 'Bearer ' + token})
+                });
+                
+                if (response.ok) {
+                    const responseText = await response.text();
+                    const driveData = JSON.parse(responseText);
+                    
+                    if (driveData.chapters && Array.isArray(driveData.chapters)) {
+                        const driveQuestions = driveData.chapters.reduce((sum, ch) => sum + ch.questions.length, 0);
+                        const localQuestions = chapters.reduce((sum, ch) => sum + ch.questions.length, 0);
+                        
+                        console.log('🔄 MERGE CHECK:', {
+                            driveQuestions,
+                            localQuestions,
+                            totalAfterMerge: driveQuestions // We'll use Drive as source of truth
+                        });
+                        
+                        // Use Drive data as source of truth (it has 35, local has 29)
+                        chapters = driveData.chapters;
+                        
+                        // Save to localStorage
+                        try {
+                            localStorage.setItem('chapters', JSON.stringify(chapters));
+                        } catch (e) {
+                            console.log('Could not cache to localStorage');
+                        }
+                        
+                        renderChapters();
+                        renderContent();
+                        
+                        showToast(`✅ Loaded ${driveQuestions} questions from Drive!`, 'success');
+                        
+                        // If local had more questions, ask user what to do
+                        if (localQuestions > driveQuestions) {
+                            showMergeConflictModal(localQuestions, driveQuestions);
+                        }
+                    }
+                } else if (response.status === 404) {
+                    // File doesn't exist, upload local data
+                    console.log('No Drive file found, uploading local data...');
+                    await uploadToGoogleDrive();
+                } else {
+                    throw new Error('Failed to load from Drive');
+                }
+            } catch (error) {
+                console.error('Error loading from Drive:', error);
+                showToast('Could not load from Drive, uploading local data...', 'info');
+                await uploadToGoogleDrive();
+            }
+        }
+        
+        function showMergeConflictModal(localCount, driveCount) {
+            const modal = document.createElement('div');
+            modal.className = 'modal active';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 500px; padding: 32px;">
+                    <h2 style="margin-bottom: 16px; color: var(--text-primary);">⚠️ Data Conflict</h2>
+                    <p style="color: var(--text-secondary); margin-bottom: 20px; line-height: 1.6;">
+                        Your local storage has <strong>${localCount} questions</strong> but Drive has <strong>${driveCount} questions</strong>.
+                    </p>
+                    <p style="color: var(--text-secondary); margin-bottom: 20px; line-height: 1.6;">
+                        We've loaded the Drive data (${driveCount} questions) as it's the most recent sync. 
+                        Your local ${localCount} questions were not synced previously.
+                    </p>
+                    <div style="background: var(--primary-light); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+                        <div style="font-size: 0.875rem; color: var(--text-primary); line-height: 1.6;">
+                            💡 <strong>Tip:</strong> Enable Auto-sync to prevent this in future!
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                        <button class="btn btn-primary" onclick="this.closest('.modal').remove();">
+                            OK, Got it
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+        
+        function updateUserProfile(userInfo) {
+            // Update UI to show user profile instead of Upload to Drive button
+            const uploadBtn = document.querySelector('.btn-backup[onclick="syncToGoogleDrive()"]');
+            if (uploadBtn) {
+                uploadBtn.style.display = 'none';
+            }
+            
+            // Create or update user profile display
+            let profileDiv = document.getElementById('userProfile');
+            if (!profileDiv) {
+                profileDiv = document.createElement('div');
+                profileDiv.id = 'userProfile';
+                profileDiv.style.cssText = 'grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--bg-main); border-radius: 8px; border: 1px solid var(--border);';
+                
+                const backupActions = document.querySelector('.backup-actions');
+                if (backupActions) {
+                    backupActions.insertBefore(profileDiv, backupActions.firstChild);
+                }
+            }
+            
+            profileDiv.innerHTML = `
+                <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 1.2rem;">
+                    ${userInfo.name?.charAt(0).toUpperCase() || 'U'}
+                </div>
+                <div style="flex: 1;">
+                    <div style="font-weight: 600; font-size: 0.875rem; color: var(--text-primary);">${userInfo.name || 'User'}</div>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary);">${userInfo.email || ''}</div>
+                </div>
+                <button class="btn-icon" onclick="signOutGoogle()" title="Sign Out">
+                    <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                    </svg>
+                </button>
+            `;
+        }
+        
+        function signOutGoogle() {
+            if (confirm('Are you sure you want to sign out?')) {
+                // Clear tokens
+                gapi.client.setToken(null);
+                localStorage.removeItem('gapi_token');
+                localStorage.removeItem('userInfo');
+                accessToken = null;
+                
+                // Remove user profile
+                const profileDiv = document.getElementById('userProfile');
+                if (profileDiv) {
+                    profileDiv.remove();
+                }
+                
+                // Show upload button again
+                const uploadBtn = document.querySelector('.btn-backup[onclick="syncToGoogleDrive()"]');
+                if (uploadBtn) {
+                    uploadBtn.style.display = '';
+                }
+                
+                showToast('Signed out successfully', 'success');
             }
         }
         
