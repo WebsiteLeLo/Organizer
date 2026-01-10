@@ -2335,12 +2335,45 @@
                 localStorage.setItem('gapi_token', JSON.stringify(tokenWithExpiry));
                 console.log('✅ Token stored for future use');
                 
-                // Store user info from Google
+                // Extract user info from token - trying multiple methods
+                let userEmail = '';
+                let userName = '';
+                
+                // Try to get from token hints
+                if (token.login_hint) {
+                    userEmail = token.login_hint;
+                    userName = userEmail.split('@')[0];
+                } else if (resp.scope) {
+                    // Try to extract from response
+                    userEmail = 'user@gmail.com';
+                    userName = 'User';
+                }
+                
+                // Try to get actual user info from Google People API
+                try {
+                    const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+                    
+                    if (userInfoResponse.ok) {
+                        const userData = await userInfoResponse.json();
+                        userEmail = userData.email || userEmail;
+                        userName = userData.name || userData.given_name || userName;
+                        console.log('✅ Got user info from Google:', userData);
+                    }
+                } catch (e) {
+                    console.log('Could not fetch user info, using fallback');
+                }
+                
                 const userInfo = {
-                    email: token.login_hint || 'user@gmail.com',
-                    name: token.login_hint?.split('@')[0] || 'User'
+                    email: userEmail,
+                    name: userName
                 };
+                
                 localStorage.setItem('userInfo', JSON.stringify(userInfo));
+                console.log('👤 User info stored:', userInfo);
+                
+                // Update UI immediately
                 updateUserProfile(userInfo);
                 
                 // After authentication, check if Drive file exists
@@ -2448,22 +2481,32 @@
         }
         
         function updateUserProfile(userInfo) {
+            console.log('👤 updateUserProfile called with:', userInfo);
+            
             // Update UI to show user profile instead of Upload to Drive button
             const uploadBtn = document.querySelector('.btn-backup[onclick="syncToGoogleDrive()"]');
+            console.log('📍 Upload button found:', !!uploadBtn);
+            
             if (uploadBtn) {
                 uploadBtn.style.display = 'none';
+                console.log('✅ Upload button hidden');
             }
             
             // Create or update user profile display
             let profileDiv = document.getElementById('userProfile');
+            console.log('📍 Existing profile div:', !!profileDiv);
+            
             if (!profileDiv) {
                 profileDiv = document.createElement('div');
                 profileDiv.id = 'userProfile';
                 profileDiv.style.cssText = 'grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--bg-main); border-radius: 8px; border: 1px solid var(--border);';
                 
                 const backupActions = document.querySelector('.backup-actions');
+                console.log('📍 Backup actions found:', !!backupActions);
+                
                 if (backupActions) {
                     backupActions.insertBefore(profileDiv, backupActions.firstChild);
+                    console.log('✅ Profile div inserted');
                 }
             }
             
@@ -2481,6 +2524,8 @@
                     </svg>
                 </button>
             `;
+            
+            console.log('✅ Profile HTML updated');
         }
         
         function signOutGoogle() {
