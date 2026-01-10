@@ -1035,18 +1035,36 @@
                     <div id="autoSyncStatus" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px; padding-left: 24px;"></div>
                 </div>
                 
-                <div class="backup-actions-simple">
+                <div class="backup-actions">
+                    <button class="btn-backup" onclick="syncToGoogleDrive()" title="Upload to Google Drive">
+                        <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
+                        </svg>
+                        Upload to Drive
+                    </button>
+                    <button class="btn-backup" onclick="loadFromGoogleDrive()" title="Load from Google Drive">
+                        <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                        </svg>
+                        Load from Drive
+                    </button>
+                    <button class="btn-backup" onclick="downloadDriveFile()" title="Download Drive File">
+                        <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        Download Drive
+                    </button>
                     <button class="btn-backup" onclick="exportAllData()" title="Export All Chapters">
                         <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                         </svg>
-                        Export Backup
+                        Export Local
                     </button>
                     <button class="btn-backup" onclick="importData()" title="Import Chapters">
                         <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
                         </svg>
-                        Import Backup
+                        Import
                     </button>
                 </div>
             </div>
@@ -2396,9 +2414,11 @@
                 localStorage.setItem('userInfo', JSON.stringify(userInfo));
                 console.log('👤 User info stored in localStorage:', userInfo);
                 
-                // Update UI immediately
+                // Update UI immediately (with delay to ensure DOM is ready)
                 console.log('🎨 Calling updateUserProfile...');
-                updateUserProfile(userInfo);
+                setTimeout(() => {
+                    updateUserProfile(userInfo);
+                }, 500);
                 
                 // After authentication, check if Drive file exists
                 console.log('💾 Checking for Drive file...');
