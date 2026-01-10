@@ -1041,13 +1041,29 @@
         let selectedTagFilter = null;
         
         function saveData() {
+            // If auto-sync is enabled and we have Drive access, prioritize Drive storage
+            if (autoSyncEnabled && accessToken && driveFileId) {
+                // Save minimal data to localStorage (just metadata)
+                try {
+                    const lightData = {
+                        synced: true,
+                        lastSync: Date.now(),
+                        chapterCount: chapters.length,
+                        questionCount: chapters.reduce((sum, ch) => sum + ch.questions.length, 0)
+                    };
+                    localStorage.setItem('chapters_meta', JSON.stringify(lightData));
+                } catch (e) {
+                    console.log('Could not save metadata');
+                }
+                
+                // Upload to Drive (this is the primary storage now)
+                uploadToGoogleDrive();
+                return;
+            }
+            
+            // Otherwise, try to save to localStorage
             try {
                 localStorage.setItem('chapters', JSON.stringify(chapters));
-                
-                // Auto-sync to Google Drive if enabled
-                if (autoSyncEnabled && accessToken && driveFileId) {
-                    uploadToGoogleDrive();
-                }
             } catch (e) {
                 if (e.name === 'QuotaExceededError') {
                     handleQuotaExceeded();
@@ -1059,21 +1075,17 @@
         }
         
         function handleQuotaExceeded() {
-            showToast('Storage full! Syncing to Google Drive...', 'info');
-            
-            // Force sync to Google Drive
-            if (!accessToken) {
-                // Need to authenticate first
-                showStorageFullModal();
-            } else {
-                // Sync to Drive and then clear some local data
-                uploadToGoogleDrive().then(() => {
-                    // After successful upload, try to save with compression
-                    compressAndSave();
-                }).catch(err => {
-                    showStorageFullModal();
-                });
+            // Check if already showing modal
+            if (document.querySelector('.storage-full-modal')) {
+                return;
             }
+            
+            showToast('Storage full! Please sync to Google Drive.', 'error');
+            
+            // Small delay to prevent immediate popup during file operations
+            setTimeout(() => {
+                showStorageFullModal();
+            }, 500);
         }
         
         function compressAndSave() {
@@ -1096,8 +1108,13 @@
         }
         
         function showStorageFullModal() {
+            // Prevent duplicate modals
+            if (document.querySelector('.storage-full-modal')) {
+                return;
+            }
+            
             const modal = document.createElement('div');
-            modal.className = 'modal active';
+            modal.className = 'modal active storage-full-modal';
             modal.innerHTML = `
                 <div class="modal-content" style="max-width: 500px; padding: 32px;">
                     <h2 style="margin-bottom: 16px; color: var(--text-primary);">⚠️ Storage Full</h2>
@@ -1111,7 +1128,7 @@
                     </ol>
                     <div style="background: var(--primary-light); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
                         <div style="font-size: 0.875rem; color: var(--text-primary); line-height: 1.6;">
-                            💡 <strong>Tip:</strong> Enable "Auto-sync to Drive" to prevent this in future.
+                            💡 <strong>Tip:</strong> Enable "Auto-sync to Drive" to prevent this in future. Once enabled, data will be stored in Google Drive instead of browser storage.
                         </div>
                     </div>
                     <div style="display: flex; gap: 12px; justify-content: flex-end;">
