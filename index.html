@@ -458,24 +458,6 @@
             background: var(--bg-main);
         }
         
-        .author-info {
-            text-align: center;
-        }
-        
-        .author-label {
-            font-size: 0.65rem;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 2px;
-        }
-        
-        .author-name {
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: var(--primary);
-        }
-        
         .chapters-list {
             display: flex;
             flex-direction: column;
@@ -1193,10 +1175,6 @@
             </div>
             
             <div class="sidebar-footer">
-                <div class="author-info">
-                    <div class="author-label">Created by</div>
-                    <div class="author-name">Gourav Saini (Hiroshi)</div>
-                </div>
             </div>
         </div>
         
@@ -2109,7 +2087,6 @@
             const chapter = chapters[index];
             const exportData = {
                 appName: 'Lecture Notes Manager',
-                author: 'Gourav Saini (Hiroshi)',
                 version: '1.0',
                 exportDate: new Date().toISOString(),
                 exportType: 'single-chapter',
@@ -2140,7 +2117,6 @@
             
             const exportData = {
                 appName: 'Lecture Notes Manager',
-                author: 'Gourav Saini (Hiroshi)',
                 version: '1.0',
                 exportDate: new Date().toISOString(),
                 exportType: 'full-backup',
@@ -2794,7 +2770,6 @@
                 
                 const exportData = {
                     appName: 'Lecture Notes Manager',
-                    author: 'Gourav Saini (Hiroshi)',
                     version: '1.0',
                     exportDate: new Date().toISOString(),
                     exportType: 'google-drive-sync',
@@ -3154,13 +3129,10 @@
             pdf.setFontSize(9);
             pdf.text(`Generated on ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}`, pageWidth / 2, 75, { align: 'center' });
             
-            // Author credit on title page
-            pdf.setFontSize(8);
-            pdf.setTextColor(150, 150, 150);
-            pdf.text('Created with Lecture Notes Manager', pageWidth / 2, pageHeight - 25, { align: 'center' });
+            // App credit on title page
             pdf.setFontSize(9);
-            pdf.setTextColor(79, 70, 229);
-            pdf.text('by Gourav Saini (Hiroshi)', pageWidth / 2, pageHeight - 18, { align: 'center' });
+            pdf.setTextColor(120, 120, 120);
+            pdf.text('Created with Lecture Notes Manager', pageWidth / 2, pageHeight - 20, { align: 'center' });
             
             // Start questions on new page
             pdf.addPage();
