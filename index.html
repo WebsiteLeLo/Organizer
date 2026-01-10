@@ -1127,7 +1127,7 @@
         const GOOGLE_CLIENT_ID = '248764468426-pcpi554okuf7vr1ovjirg6fjaa9l1sa0.apps.googleusercontent.com';
         const GOOGLE_API_KEY = 'AIzaSyD7bMlSNVfqPQFdupxyi7NqARFui71WS4E';
         const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"];
-        const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+        const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
         
         let gapiInited = false;
         let gisInited = false;
@@ -2126,8 +2126,6 @@
                     client_id: GOOGLE_CLIENT_ID,
                     scope: SCOPES,
                     callback: '', // Will be set when sync is called
-                    // Use popup mode to avoid redirect_uri issues
-                    ux_mode: 'popup',
                 });
                 gisInited = true;
                 console.log('✅ GIS initialized successfully');
@@ -2145,11 +2143,16 @@
                                     gapi.client.setToken(tokenObj);
                                     accessToken = tokenObj.access_token;
                                     console.log('✅ Restored previous session token');
-                                    console.log('🎉 Google Drive is ready! Auto-load will start...');
+                                    
+                                    // Restore user profile
+                                    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+                                    if (userInfo.email) {
+                                        updateUserProfile(userInfo);
+                                    }
                                 } else {
                                     console.log('⚠️ gapi.client not ready yet');
                                 }
-                            }, 1000); // Give 1 second for gapi.client to initialize
+                            }, 1000);
                         } else {
                             console.log('⚠️ Stored token expired, removing...');
                             localStorage.removeItem('gapi_token');
@@ -2343,43 +2346,46 @@
                 localStorage.setItem('gapi_token', JSON.stringify(tokenWithExpiry));
                 console.log('✅ Token stored in localStorage');
                 
-                // Extract user info from token - trying multiple methods
+                // Extract user info - use gapi.client.request for proper authentication
                 let userEmail = '';
                 let userName = '';
                 
                 console.log('👤 Extracting user info...');
                 
-                // Try to get from token hints
-                if (token.login_hint) {
-                    userEmail = token.login_hint;
-                    userName = userEmail.split('@')[0];
-                    console.log('✅ Got user info from token.login_hint:', {userEmail, userName});
-                } else if (resp.scope) {
-                    // Try to extract from response
-                    userEmail = 'user@gmail.com';
-                    userName = 'User';
-                    console.log('⚠️ Using fallback user info');
-                }
-                
-                // Try to get actual user info from Google People API
                 try {
-                    console.log('🔍 Fetching user info from Google API...');
-                    const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-                        headers: { 'Authorization': `Bearer ${accessToken}` }
-                    });
+                    console.log('🔍 Using gapi.client.request for user info...');
                     
-                    console.log('User info response status:', userInfoResponse.status);
+                    // Load the oauth2 API
+                    await gapi.client.load('oauth2', 'v2');
                     
-                    if (userInfoResponse.ok) {
-                        const userData = await userInfoResponse.json();
-                        userEmail = userData.email || userEmail;
-                        userName = userData.name || userData.given_name || userName;
-                        console.log('✅ Got user info from Google API:', userData);
-                    } else {
-                        console.log('⚠️ User info response not OK:', userInfoResponse.status);
-                    }
+                    // Get user info using gapi client
+                    const userInfoResponse = await gapi.client.oauth2.userinfo.get();
+                    console.log('✅ Got user info:', userInfoResponse.result);
+                    
+                    userEmail = userInfoResponse.result.email || '';
+                    userName = userInfoResponse.result.name || userInfoResponse.result.given_name || '';
+                    
                 } catch (e) {
-                    console.log('⚠️ Could not fetch user info:', e);
+                    console.log('⚠️ Could not fetch user info via gapi, trying fallback:', e);
+                    
+                    // Fallback: try direct fetch
+                    try {
+                        const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+                            headers: { 'Authorization': `Bearer ${accessToken}` }
+                        });
+                        
+                        if (response.ok) {
+                            const data = await response.json();
+                            userEmail = data.email || '';
+                            userName = data.name || '';
+                            console.log('✅ Got user info from direct fetch:', data);
+                        }
+                    } catch (e2) {
+                        console.log('⚠️ All methods failed, using token hint');
+                        // Last resort: use token hint or default
+                        userEmail = token.login_hint || 'user@gmail.com';
+                        userName = userEmail.split('@')[0];
+                    }
                 }
                 
                 const userInfo = {
