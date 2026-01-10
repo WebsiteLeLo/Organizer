@@ -950,6 +950,7 @@
                         <input type="checkbox" id="autoSyncToggle" onchange="toggleAutoSync(this.checked)">
                         <span class="toggle-text">Auto-sync to Drive</span>
                     </label>
+                    <div id="autoSyncStatus" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px; padding-left: 24px;"></div>
                 </div>
             </div>
             
@@ -1272,8 +1273,28 @@
         }
         
         function saveData() {
+            console.log('💾 saveData() called');
+            
+            // Check token from gapi.client if accessToken variable is not set
+            if (!accessToken && gapi && gapi.client) {
+                const currentToken = gapi.client.getToken();
+                if (currentToken && currentToken.access_token) {
+                    accessToken = currentToken.access_token;
+                }
+            }
+            
+            // Debug logging
+            console.log('📊 Auto-upload check:', {
+                autoSyncEnabled: autoSyncEnabled,
+                hasAccessToken: !!accessToken,
+                hasDriveFileId: !!driveFileId,
+                canAutoUpload: autoSyncEnabled && accessToken && driveFileId
+            });
+            
             // If auto-sync is enabled and we have Drive access, prioritize Drive storage
             if (autoSyncEnabled && accessToken && driveFileId) {
+                console.log('✅ Auto-uploading to Drive...');
+                
                 // Save minimal data to localStorage (just metadata)
                 try {
                     const lightData = {
@@ -1292,9 +1313,18 @@
                 return;
             }
             
+            // If auto-sync is enabled but no token/file ID, inform user
+            if (autoSyncEnabled && (!accessToken || !driveFileId)) {
+                console.log('⚠️ Auto-sync is ON but not ready:', {
+                    needsAuthentication: !accessToken,
+                    needsFirstUpload: !driveFileId
+                });
+            }
+            
             // Otherwise, try to save to localStorage
             try {
                 localStorage.setItem('chapters', JSON.stringify(chapters));
+                console.log('💾 Saved to localStorage');
             } catch (e) {
                 if (e.name === 'QuotaExceededError') {
                     handleQuotaExceeded();
@@ -1388,14 +1418,54 @@
             if (enabled) {
                 if (!accessToken) {
                     // Authenticate first
+                    updateAutoSyncStatus('⚠️ Authenticating...', 'orange');
                     syncToGoogleDrive();
+                } else if (!driveFileId) {
+                    updateAutoSyncStatus('⚠️ Upload once to initialize', 'orange');
+                    showToast('Please upload to Drive once to initialize auto-sync', 'info');
                 } else {
+                    updateAutoSyncStatus('✅ Active', 'green');
                     showToast('Auto-sync enabled!', 'success');
                 }
             } else {
+                updateAutoSyncStatus('', '');
                 showToast('Auto-sync disabled', 'info');
             }
         }
+        
+        function updateAutoSyncStatus(message, color) {
+            const statusDiv = document.getElementById('autoSyncStatus');
+            if (statusDiv) {
+                statusDiv.textContent = message;
+                statusDiv.style.color = color === 'green' ? '#10b981' : color === 'orange' ? '#f59e0b' : 'var(--text-secondary)';
+            }
+        }
+        
+        // Check and update auto-sync status periodically
+        function checkAutoSyncStatus() {
+            if (!autoSyncEnabled) {
+                updateAutoSyncStatus('', '');
+                return;
+            }
+            
+            // Check token from gapi.client
+            let hasToken = !!accessToken;
+            if (!hasToken && gapi && gapi.client) {
+                const currentToken = gapi.client.getToken();
+                hasToken = !!(currentToken && currentToken.access_token);
+            }
+            
+            if (!hasToken) {
+                updateAutoSyncStatus('⚠️ Not authenticated', 'orange');
+            } else if (!driveFileId) {
+                updateAutoSyncStatus('⚠️ Not initialized', 'orange');
+            } else {
+                updateAutoSyncStatus('✅ Active', 'green');
+            }
+        }
+        
+        // Check status every 5 seconds
+        setInterval(checkAutoSyncStatus, 5000);
         
         function renderChapters() {
             const chaptersList = document.getElementById('chaptersList');
@@ -2558,6 +2628,9 @@
         if (autoSyncToggle) {
             autoSyncToggle.checked = autoSyncEnabled;
         }
+        
+        // Initial status check
+        setTimeout(checkAutoSyncStatus, 2000);
         
         // Enter key support
         document.getElementById('chapterInput').addEventListener('keypress', (e) => {
