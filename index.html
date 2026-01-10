@@ -577,6 +577,112 @@
             font-size: 0.875rem;
         }
         
+        /* Question Tags */
+        .tag-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: white;
+            margin-right: 4px;
+        }
+        
+        .tag-selector {
+            position: absolute;
+            top: 40px;
+            right: 10px;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 20;
+            display: none;
+            min-width: 150px;
+        }
+        
+        .tag-selector.active {
+            display: block;
+        }
+        
+        .tag-option {
+            padding: 6px 10px;
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+        
+        .tag-option:hover {
+            background: var(--bg-hover);
+        }
+        
+        .tag-option input[type="checkbox"] {
+            width: 14px;
+            height: 14px;
+        }
+        
+        .tag-color-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        
+        .tag-filters {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            padding: 12px;
+            background: var(--bg-main);
+            border-radius: 8px;
+        }
+        
+        .tag-filter-btn {
+            padding: 6px 12px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            background: white;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            color: var(--text-primary);
+        }
+        
+        .tag-filter-btn:hover {
+            border-color: var(--primary);
+            transform: translateY(-1px);
+        }
+        
+        .tag-filter-btn.active {
+            color: white;
+            border-color: transparent;
+        }
+        
+        .tag-filter-btn.all {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        
+        .question-tags {
+            position: absolute;
+            top: 10px;
+            left: 60px;
+            z-index: 5;
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            max-width: calc(100% - 120px);
+        }
+        
         input[type="file"] {
             display: none;
         }
@@ -920,17 +1026,111 @@
         let driveFileId = localStorage.getItem('driveFileId') || null;
         let autoSyncEnabled = localStorage.getItem('autoSyncEnabled') === 'true';
         
+        // Question Tags Configuration
+        const QUESTION_TAGS = [
+            { id: 'easy', name: 'Easy', color: '#10b981' },
+            { id: 'hard', name: 'Hard', color: '#ef4444' },
+            { id: 'jee-mains', name: 'JEE Mains', color: '#f59e0b' },
+            { id: 'jee-advanced', name: 'JEE Advanced', color: '#8b5cf6' },
+            { id: 'olympiad', name: 'Olympiad', color: '#ec4899' }
+        ];
+        
         let chapters = JSON.parse(localStorage.getItem('chapters')) || [];
         let currentChapter = null;
         let currentImageIndex = -1;
+        let selectedTagFilter = null;
         
         function saveData() {
-            localStorage.setItem('chapters', JSON.stringify(chapters));
-            
-            // Auto-sync to Google Drive if enabled
-            if (autoSyncEnabled && accessToken && driveFileId) {
-                uploadToGoogleDrive();
+            try {
+                localStorage.setItem('chapters', JSON.stringify(chapters));
+                
+                // Auto-sync to Google Drive if enabled
+                if (autoSyncEnabled && accessToken && driveFileId) {
+                    uploadToGoogleDrive();
+                }
+            } catch (e) {
+                if (e.name === 'QuotaExceededError') {
+                    handleQuotaExceeded();
+                } else {
+                    console.error('Save error:', e);
+                    showToast('Failed to save data', 'error');
+                }
             }
+        }
+        
+        function handleQuotaExceeded() {
+            showToast('Storage full! Syncing to Google Drive...', 'info');
+            
+            // Force sync to Google Drive
+            if (!accessToken) {
+                // Need to authenticate first
+                showStorageFullModal();
+            } else {
+                // Sync to Drive and then clear some local data
+                uploadToGoogleDrive().then(() => {
+                    // After successful upload, try to save with compression
+                    compressAndSave();
+                }).catch(err => {
+                    showStorageFullModal();
+                });
+            }
+        }
+        
+        function compressAndSave() {
+            // Try to save essential data only (without full images in some cases)
+            const lightweightData = chapters.map(chapter => ({
+                ...chapter,
+                questions: chapter.questions.map(q => ({
+                    timestamp: q.timestamp,
+                    tags: q.tags,
+                    imagePreview: q.image ? q.image.substring(0, 100) + '...' : null // Store only preview
+                }))
+            }));
+            
+            try {
+                localStorage.setItem('chapters_backup', JSON.stringify(lightweightData));
+                showToast('Data synced to Drive. Local cache optimized.', 'success');
+            } catch (e) {
+                showStorageFullModal();
+            }
+        }
+        
+        function showStorageFullModal() {
+            const modal = document.createElement('div');
+            modal.className = 'modal active';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 500px; padding: 32px;">
+                    <h2 style="margin-bottom: 16px; color: var(--text-primary);">⚠️ Storage Full</h2>
+                    <p style="color: var(--text-secondary); margin-bottom: 20px; line-height: 1.6;">
+                        Your browser's local storage is full. To continue adding questions, you need to:
+                    </p>
+                    <ol style="color: var(--text-secondary); line-height: 2; margin-bottom: 24px; padding-left: 20px;">
+                        <li><strong>Sync to Google Drive</strong> (Recommended) - Your data will be safely stored in the cloud</li>
+                        <li><strong>Export & Clear</strong> - Download your data and start fresh</li>
+                        <li><strong>Delete old chapters</strong> - Remove chapters you don't need</li>
+                    </ol>
+                    <div style="background: var(--primary-light); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+                        <div style="font-size: 0.875rem; color: var(--text-primary); line-height: 1.6;">
+                            💡 <strong>Tip:</strong> Enable "Auto-sync to Drive" to prevent this in future.
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                        <button class="btn btn-primary" onclick="this.closest('.modal').remove(); syncToGoogleDrive();">
+                            Sync to Drive
+                        </button>
+                        <button class="btn btn-success" onclick="this.closest('.modal').remove(); exportAllData();">
+                            Export Data
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            modal.onclick = (e) => {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            };
         }
         
         function toggleAutoSync(enabled) {
@@ -1066,6 +1266,20 @@
                     </div>
                 </div>
                 
+                <div class="tag-filters">
+                    <button class="tag-filter-btn all ${!selectedTagFilter ? 'active' : ''}" onclick="filterByTag(null)">
+                        All (${chapter.questions.length})
+                    </button>
+                    ${QUESTION_TAGS.map(tag => {
+                        const count = chapter.questions.filter(q => q.tags && q.tags.includes(tag.id)).length;
+                        return `<button class="tag-filter-btn ${selectedTagFilter === tag.id ? 'active' : ''}" 
+                                style="${selectedTagFilter === tag.id ? `background: ${tag.color};` : ''}"
+                                onclick="filterByTag('${tag.id}')">
+                            ${tag.name} (${count})
+                        </button>`;
+                    }).join('')}
+                </div>
+                
                 <div class="upload-area" id="uploadArea">
                     <svg class="upload-icon icon-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
@@ -1129,7 +1343,8 @@
                     reader.onload = (e) => {
                         chapters[currentChapter].questions.push({
                             image: e.target.result,
-                            timestamp: Date.now()
+                            timestamp: Date.now(),
+                            tags: []
                         });
                         saveData();
                         renderQuestions();
@@ -1145,13 +1360,19 @@
             const questionsGrid = document.getElementById('questionsGrid');
             const chapter = chapters[currentChapter];
             
-            if (!chapter || chapter.questions.length === 0) {
+            // Filter questions by selected tag
+            let questionsToRender = chapter.questions;
+            if (selectedTagFilter) {
+                questionsToRender = chapter.questions.filter(q => q.tags && q.tags.includes(selectedTagFilter));
+            }
+            
+            if (!chapter || questionsToRender.length === 0) {
                 questionsGrid.innerHTML = `
                     <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);">
                         <svg style="width: 48px; height: 48px; margin: 0 auto 16px; opacity: 0.3;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                         </svg>
-                        <p>No questions yet</p>
+                        <p>${selectedTagFilter ? 'No questions with this tag' : 'No questions yet'}</p>
                     </div>
                 `;
                 return;
@@ -1159,16 +1380,17 @@
             
             questionsGrid.innerHTML = '';
             
-            chapter.questions.forEach((question, index) => {
+            questionsToRender.forEach((question, displayIndex) => {
+                const actualIndex = chapter.questions.indexOf(question);
                 const questionCard = document.createElement('div');
                 questionCard.className = 'question-card';
                 questionCard.draggable = true;
-                questionCard.dataset.index = index;
+                questionCard.dataset.index = actualIndex;
                 
                 // Drag events
                 questionCard.ondragstart = (e) => {
                     e.dataTransfer.effectAllowed = 'move';
-                    e.dataTransfer.setData('text/plain', index);
+                    e.dataTransfer.setData('text/plain', actualIndex);
                     questionCard.classList.add('dragging');
                 };
                 
@@ -1198,32 +1420,60 @@
                     }
                 };
                 
+                // Ensure tags array exists
+                if (!question.tags) question.tags = [];
+                
+                // Build tags HTML
+                const tagsHTML = question.tags.map(tagId => {
+                    const tag = QUESTION_TAGS.find(t => t.id === tagId);
+                    return tag ? `<span class="tag-badge" style="background: ${tag.color};">${tag.name}</span>` : '';
+                }).join('');
+                
                 questionCard.innerHTML = `
-                    <div class="question-number">Q${index + 1}</div>
+                    <div class="question-number">Q${actualIndex + 1}</div>
+                    <div class="question-tags">
+                        ${tagsHTML}
+                    </div>
                     <div class="drag-handle" title="Drag to reorder">
                         <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/>
                         </svg>
                     </div>
-                    <img src="${question.image}" class="question-image" alt="Question ${index + 1}" onclick="viewImage('${question.image}')">
+                    <img src="${question.image}" class="question-image" alt="Question ${actualIndex + 1}" onclick="viewImage('${question.image}')">
                     <div class="question-actions">
                         <div class="reorder-buttons">
-                            <button class="btn-icon-small" onclick="moveQuestion(${index}, 'up')" title="Move Up" ${index === 0 ? 'disabled' : ''}>
+                            <button class="btn-icon-small" onclick="event.stopPropagation(); toggleTagSelector(${actualIndex})" title="Add Tags">
+                                <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                                </svg>
+                            </button>
+                            <button class="btn-icon-small" onclick="moveQuestion(${actualIndex}, 'up')" title="Move Up" ${actualIndex === 0 ? 'disabled' : ''}>
                                 <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
                                 </svg>
                             </button>
-                            <button class="btn-icon-small" onclick="moveQuestion(${index}, 'down')" title="Move Down" ${index === chapter.questions.length - 1 ? 'disabled' : ''}>
+                            <button class="btn-icon-small" onclick="moveQuestion(${actualIndex}, 'down')" title="Move Down" ${actualIndex === chapter.questions.length - 1 ? 'disabled' : ''}>
                                 <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                                 </svg>
                             </button>
                         </div>
-                        <button class="btn-icon" onclick="deleteQuestion(${index})" title="Delete Question">
+                        <button class="btn-icon" onclick="deleteQuestion(${actualIndex})" title="Delete Question">
                             <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                             </svg>
                         </button>
+                    </div>
+                    <div class="tag-selector" id="tagSelector${actualIndex}">
+                        ${QUESTION_TAGS.map(tag => `
+                            <label class="tag-option">
+                                <input type="checkbox" 
+                                    ${question.tags.includes(tag.id) ? 'checked' : ''} 
+                                    onchange="toggleQuestionTag(${actualIndex}, '${tag.id}', this.checked)">
+                                <span class="tag-color-dot" style="background: ${tag.color};"></span>
+                                <span>${tag.name}</span>
+                            </label>
+                        `).join('')}
                     </div>
                 `;
                 
@@ -1271,6 +1521,54 @@
             renderQuestions();
             showToast(`Question moved from Q${fromIndex + 1} to Q${toIndex + 1}!`, 'success');
         }
+        
+        // Tag Management Functions
+        function toggleTagSelector(questionIndex) {
+            const selector = document.getElementById(`tagSelector${questionIndex}`);
+            const allSelectors = document.querySelectorAll('.tag-selector');
+            
+            // Close all other selectors
+            allSelectors.forEach(s => {
+                if (s.id !== `tagSelector${questionIndex}`) {
+                    s.classList.remove('active');
+                }
+            });
+            
+            // Toggle current selector
+            selector.classList.toggle('active');
+        }
+        
+        function toggleQuestionTag(questionIndex, tagId, isChecked) {
+            const question = chapters[currentChapter].questions[questionIndex];
+            
+            if (!question.tags) {
+                question.tags = [];
+            }
+            
+            if (isChecked) {
+                if (!question.tags.includes(tagId)) {
+                    question.tags.push(tagId);
+                }
+            } else {
+                question.tags = question.tags.filter(t => t !== tagId);
+            }
+            
+            saveData();
+            renderContent(); // Re-render to update tag counts in filter buttons
+            showToast('Tag updated!', 'success');
+        }
+        
+        function filterByTag(tagId) {
+            selectedTagFilter = tagId;
+            renderContent();
+        }
+        
+        // Close tag selectors when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.tag-selector') && !e.target.closest('.btn-icon-small')) {
+                document.querySelectorAll('.tag-selector').forEach(s => s.classList.remove('active'));
+            }
+        });
         
         // Export single chapter
         function exportChapter(event, index) {
