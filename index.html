@@ -1123,7 +1123,21 @@
                 });
                 
                 if (response.ok) {
-                    const data = await response.json();
+                    // Get the full response text first (not json directly)
+                    const responseText = await response.text();
+                    console.log(`📦 Raw response size: ${(responseText.length / (1024 * 1024)).toFixed(2)} MB`);
+                    
+                    // Now parse it
+                    let data;
+                    try {
+                        data = JSON.parse(responseText);
+                    } catch (parseError) {
+                        console.error('❌ JSON Parse Error:', parseError);
+                        console.log('First 500 chars:', responseText.substring(0, 500));
+                        console.log('Last 500 chars:', responseText.substring(responseText.length - 500));
+                        showToast('Error parsing Drive data. File may be corrupted.', 'error');
+                        return;
+                    }
                     
                     console.log('📥 LOADED FROM DRIVE:', {
                         hasChapters: !!data.chapters,
@@ -1132,18 +1146,44 @@
                         totalQuestions: data.totalQuestions || 'not specified',
                         questionsPerChapter: data.chapters?.map(ch => ({
                             name: ch.name,
-                            questions: ch.questions?.length || 0
+                            questions: ch.questions?.length || 0,
+                            hasAllQuestions: ch.questions?.every(q => q.image) || false
                         })) || []
                     });
                     
+                    // Deep verification
                     if (data.chapters && Array.isArray(data.chapters)) {
+                        let totalQuestionsInData = 0;
+                        let questionsWithImages = 0;
+                        
+                        data.chapters.forEach(ch => {
+                            if (ch.questions && Array.isArray(ch.questions)) {
+                                totalQuestionsInData += ch.questions.length;
+                                questionsWithImages += ch.questions.filter(q => q.image).length;
+                            }
+                        });
+                        
+                        console.log('🔍 DEEP VERIFICATION:', {
+                            totalQuestionsInData,
+                            questionsWithImages,
+                            questionsWithoutImages: totalQuestionsInData - questionsWithImages
+                        });
+                        
                         chapters = data.chapters;
                         
-                        // Save to localStorage as cache
-                        try {
-                            localStorage.setItem('chapters', JSON.stringify(chapters));
-                        } catch (e) {
-                            console.log('⚠️ Could not cache to localStorage (too large)');
+                        // Don't save to localStorage if too large
+                        const dataSize = JSON.stringify(chapters).length;
+                        console.log(`💾 Data size: ${(dataSize / (1024 * 1024)).toFixed(2)} MB`);
+                        
+                        if (dataSize < 5 * 1024 * 1024) { // Less than 5MB
+                            try {
+                                localStorage.setItem('chapters', JSON.stringify(chapters));
+                                console.log('✅ Cached to localStorage');
+                            } catch (e) {
+                                console.log('⚠️ Could not cache to localStorage:', e.message);
+                            }
+                        } else {
+                            console.log('⚠️ Data too large for localStorage, skipping cache');
                         }
                         
                         renderChapters();
@@ -1151,7 +1191,12 @@
                         
                         const questionCount = chapters.reduce((sum, ch) => sum + ch.questions.length, 0);
                         console.log(`✅ RENDER COMPLETE: ${questionCount} questions in memory`);
-                        showToast(`Loaded ${questionCount} questions from Google Drive!`, 'success');
+                        
+                        if (questionCount !== totalQuestionsInData) {
+                            console.error('❌ MISMATCH: Rendered questions != Loaded questions');
+                        }
+                        
+                        showToast(`✅ Loaded ${questionCount} questions from Drive!`, 'success');
                     } else {
                         console.error('❌ Invalid data structure:', data);
                         showToast('Invalid data format in Drive', 'error');
@@ -1162,14 +1207,13 @@
                     localStorage.removeItem('driveFileId');
                 } else if (response.status === 401) {
                     showToast('Authentication expired. Please sign in again.', 'error');
-                    // Clear token and retry
                     gapi.client.setToken(null);
                     syncToGoogleDrive();
                 } else {
                     showToast(`Could not load from Drive (Error ${response.status})`, 'error');
                 }
             } catch (error) {
-                console.error('Error loading from Drive:', error);
+                console.error('❌ Error loading from Drive:', error);
                 showToast('Error loading from Drive. Check console.', 'error');
             } finally {
                 isLoadingFromDrive = false;
