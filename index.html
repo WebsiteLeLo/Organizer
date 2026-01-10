@@ -155,7 +155,7 @@
         }
         
         .add-chapter-section {
-            padding: 20px;
+            padding: 16px 20px;
             border-bottom: 1px solid var(--border);
         }
         
@@ -242,11 +242,31 @@
         .chapters-section {
             flex: 1;
             overflow-y: auto;
-            padding: 20px;
+            padding: 16px 20px;
+            min-height: 200px;
+            max-height: calc(100vh - 550px);
+        }
+        
+        .chapters-section::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .chapters-section::-webkit-scrollbar-track {
+            background: var(--bg-main);
+            border-radius: 3px;
+        }
+        
+        .chapters-section::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+        
+        .chapters-section::-webkit-scrollbar-thumb:hover {
+            background: var(--primary);
         }
         
         .sidebar-footer {
-            padding: 16px 20px;
+            padding: 12px 20px;
             border-top: 1px solid var(--border);
             background: var(--bg-main);
         }
@@ -256,15 +276,15 @@
         }
         
         .author-label {
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
         }
         
         .author-name {
-            font-size: 0.875rem;
+            font-size: 0.8rem;
             font-weight: 600;
             color: var(--primary);
         }
@@ -272,11 +292,11 @@
         .chapters-list {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 6px;
         }
         
         .chapter-item {
-            padding: 12px;
+            padding: 10px 12px;
             background: var(--bg-main);
             border: 1px solid transparent;
             border-radius: 8px;
@@ -307,14 +327,14 @@
             font-weight: 600;
             color: var(--text-primary);
             margin-bottom: 2px;
-            font-size: 0.875rem;
+            font-size: 0.85rem;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
         
         .chapter-count {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             color: var(--text-secondary);
             display: flex;
             align-items: center;
