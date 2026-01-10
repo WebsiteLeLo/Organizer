@@ -1059,34 +1059,81 @@
             if (localData) {
                 try {
                     chapters = JSON.parse(localData);
+                    console.log(`📂 Loaded ${chapters.length} chapters from localStorage`);
                 } catch (e) {
                     console.error('Error loading local data:', e);
                     chapters = [];
                 }
+            } else {
+                console.log('📂 No local data found');
             }
             
             // If auto-sync is enabled and we have Drive access, try to load from Drive
             if (autoSyncEnabled && driveFileId) {
+                console.log('✅ Auto-sync enabled + Drive file exists');
+                console.log('⏳ Will check for Drive data after APIs load...');
+                
+                // Show a loading indicator
+                setTimeout(() => {
+                    const contentArea = document.getElementById('contentArea');
+                    if (contentArea && !gapiInited) {
+                        const loadingDiv = document.createElement('div');
+                        loadingDiv.id = 'autoLoadIndicator';
+                        loadingDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #4f46e5; color: white; padding: 12px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-size: 14px;';
+                        loadingDiv.innerHTML = '🔄 Checking Google Drive for latest data...';
+                        document.body.appendChild(loadingDiv);
+                        
+                        // Remove after 15 seconds
+                        setTimeout(() => {
+                            const indicator = document.getElementById('autoLoadIndicator');
+                            if (indicator) indicator.remove();
+                        }, 15000);
+                    }
+                }, 1000);
+                
                 checkAndLoadFromDrive();
+            } else {
+                if (!autoSyncEnabled) {
+                    console.log('⚠️ Auto-sync is OFF. Drive data will not be loaded automatically.');
+                }
+                if (!driveFileId) {
+                    console.log('⚠️ No Drive file ID found. Upload to Drive first.');
+                }
             }
         }
         
         async function checkAndLoadFromDrive() {
+            console.log('🔄 Checking for auto-load from Drive...');
+            
             // Wait for APIs to be ready
             let attempts = 0;
-            const maxAttempts = 20;
+            const maxAttempts = 30; // Increased to 15 seconds
             
             const waitForAPIs = setInterval(() => {
                 attempts++;
                 
-                // Check if all required APIs are loaded and authenticated
-                if (gapiInited && gisInited && typeof gapi !== 'undefined' && gapi.client && gapi.client.getToken() && gapi.client.getToken().access_token) {
-                    clearInterval(waitForAPIs);
-                    accessToken = gapi.client.getToken().access_token;
-                    loadFromGoogleDrive();
+                if (attempts % 5 === 0) {
+                    console.log(`⏳ Waiting for APIs... (attempt ${attempts}/${maxAttempts})`);
+                }
+                
+                // Check if all required APIs are loaded
+                if (gapiInited && gisInited && typeof gapi !== 'undefined' && gapi.client) {
+                    // Check if we have a token (either fresh or restored)
+                    const currentToken = gapi.client.getToken();
+                    
+                    if (currentToken && currentToken.access_token) {
+                        clearInterval(waitForAPIs);
+                        accessToken = currentToken.access_token;
+                        console.log('✅ Token found! Auto-loading from Drive...');
+                        loadFromGoogleDrive();
+                    } else if (attempts >= maxAttempts) {
+                        clearInterval(waitForAPIs);
+                        console.log('⚠️ No token found. Sign in required.');
+                        console.log('💡 Click "Upload to Drive" to authenticate, then auto-load will work on next refresh.');
+                    }
                 } else if (attempts >= maxAttempts) {
                     clearInterval(waitForAPIs);
-                    console.log('Could not auto-load from Drive - APIs not ready or not authenticated');
+                    console.log('❌ Could not auto-load from Drive - APIs not ready');
                 }
             }, 500);
         }
@@ -1195,6 +1242,10 @@
                         if (questionCount !== totalQuestionsInData) {
                             console.error('❌ MISMATCH: Rendered questions != Loaded questions');
                         }
+                        
+                        // Remove loading indicator if present
+                        const indicator = document.getElementById('autoLoadIndicator');
+                        if (indicator) indicator.remove();
                         
                         showToast(`✅ Loaded ${questionCount} questions from Drive!`, 'success');
                     } else {
@@ -1916,7 +1967,6 @@
                 });
                 gisInited = true;
                 console.log('✅ GIS initialized successfully');
-                console.log('🎉 Google Drive is ready! You can now sync.');
                 
                 // Check if we have a stored token and restore it
                 const storedToken = localStorage.getItem('gapi_token');
@@ -1925,15 +1975,27 @@
                         const tokenObj = JSON.parse(storedToken);
                         // Check if token is not expired (tokens typically last 1 hour)
                         if (tokenObj.expires_at && tokenObj.expires_at > Date.now()) {
-                            gapi.client.setToken(tokenObj);
-                            accessToken = tokenObj.access_token;
-                            console.log('✅ Restored previous session');
+                            // Wait for gapi.client to be ready before setting token
+                            setTimeout(() => {
+                                if (gapi && gapi.client) {
+                                    gapi.client.setToken(tokenObj);
+                                    accessToken = tokenObj.access_token;
+                                    console.log('✅ Restored previous session token');
+                                    console.log('🎉 Google Drive is ready! Auto-load will start...');
+                                } else {
+                                    console.log('⚠️ gapi.client not ready yet');
+                                }
+                            }, 1000); // Give 1 second for gapi.client to initialize
                         } else {
+                            console.log('⚠️ Stored token expired, removing...');
                             localStorage.removeItem('gapi_token');
                         }
                     } catch (e) {
-                        console.log('Could not restore token');
+                        console.log('⚠️ Could not restore token:', e);
+                        localStorage.removeItem('gapi_token');
                     }
+                } else {
+                    console.log('💡 No stored token. Sign in required for auto-load.');
                 }
             } catch (error) {
                 console.error('❌ Error initializing GIS:', error);
