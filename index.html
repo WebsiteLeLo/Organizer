@@ -2378,11 +2378,23 @@
                 
                 // After authentication, check if Drive file exists
                 if (driveFileId) {
-                    console.log('🔄 Loading from Drive after authentication...');
+                    console.log('🔄 Drive file ID exists, loading from Drive...');
                     await loadAndMergeFromDrive();
                 } else {
-                    // First time, just upload
-                    await uploadToGoogleDrive();
+                    // Search for existing Drive file
+                    console.log('🔍 No stored file ID, searching for existing Drive file...');
+                    const existingFileId = await searchForDriveFile();
+                    
+                    if (existingFileId) {
+                        console.log('✅ Found existing Drive file:', existingFileId);
+                        driveFileId = existingFileId;
+                        localStorage.setItem('driveFileId', driveFileId);
+                        await loadAndMergeFromDrive();
+                    } else {
+                        // No existing file, upload current data
+                        console.log('📤 No existing Drive file, uploading current data...');
+                        await uploadToGoogleDrive();
+                    }
                 }
             };
             
@@ -2392,6 +2404,35 @@
             } catch (error) {
                 // If silent auth fails, show consent screen
                 tokenClient.requestAccessToken({prompt: 'consent'});
+            }
+        }
+        
+        async function searchForDriveFile() {
+            try {
+                const token = accessToken || gapi.client.getToken().access_token;
+                
+                // Search for LectureNotes_Backup.json file
+                const query = "name='LectureNotes_Backup.json' and trashed=false";
+                const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc`, {
+                    headers: new Headers({'Authorization': 'Bearer ' + token})
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('🔍 Drive search results:', data);
+                    
+                    if (data.files && data.files.length > 0) {
+                        // Return the most recent file
+                        const file = data.files[0];
+                        console.log('✅ Found existing file:', file);
+                        return file.id;
+                    }
+                }
+                
+                return null;
+            } catch (error) {
+                console.error('Error searching Drive:', error);
+                return null;
             }
         }
         
