@@ -878,18 +878,46 @@
             position: fixed;
             bottom: 24px;
             right: 24px;
-            background: var(--text-primary);
-            color: white;
-            padding: 16px 20px;
-            border-radius: 10px;
-            box-shadow: var(--shadow-lg);
+            background: white;
+            color: var(--text-primary);
+            padding: 14px 18px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
             z-index: 1000;
-            animation: slideIn 0.3s ease;
+            animation: slideInUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
             font-weight: 500;
             font-size: 0.875rem;
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
+            max-width: 400px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .toast svg {
+            flex-shrink: 0;
+        }
+        
+        @keyframes slideInUp {
+            from {
+                transform: translateY(100px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes slideOutDown {
+            from {
+                transform: translateY(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateY(100px);
+                opacity: 0;
+            }
         }
         
         @keyframes slideIn {
@@ -1260,7 +1288,7 @@
             
             // If auto-sync is enabled and we have Drive access, try to load from Drive
             if (autoSyncEnabled && driveFileId) {
-                console.log('✅ Auto-sync enabled + Drive file exists');
+                console.log('[SUCCESS] Auto-sync enabled + Drive file exists');
                 console.log('⏳ Will check for Drive data after APIs load...');
                 
                 // Show a loading indicator
@@ -1270,7 +1298,7 @@
                         const loadingDiv = document.createElement('div');
                         loadingDiv.id = 'autoLoadIndicator';
                         loadingDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #4f46e5; color: white; padding: 12px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-size: 14px;';
-                        loadingDiv.innerHTML = '🔄 Checking Google Drive for latest data...';
+                        loadingDiv.innerHTML = '[SYNC] Checking Google Drive for latest data...';
                         document.body.appendChild(loadingDiv);
                         
                         // Remove after 15 seconds
@@ -1284,16 +1312,16 @@
                 checkAndLoadFromDrive();
             } else {
                 if (!autoSyncEnabled) {
-                    console.log('⚠️ Auto-sync is OFF. Drive data will not be loaded automatically.');
+                    console.log('[WARNING] Auto-sync is OFF. Drive data will not be loaded automatically.');
                 }
                 if (!driveFileId) {
-                    console.log('⚠️ No Drive file ID found. Upload to Drive first.');
+                    console.log('[WARNING] No Drive file ID found. Upload to Drive first.');
                 }
             }
         }
         
         async function checkAndLoadFromDrive() {
-            console.log('🔄 Checking for auto-load from Drive...');
+            console.log('[SYNC] Checking for auto-load from Drive...');
             
             // Wait for APIs to be ready
             let attempts = 0;
@@ -1314,16 +1342,16 @@
                     if (currentToken && currentToken.access_token) {
                         clearInterval(waitForAPIs);
                         accessToken = currentToken.access_token;
-                        console.log('✅ Token found! Auto-loading from Drive...');
+                        console.log('[SUCCESS] Token found! Auto-loading from Drive...');
                         loadFromGoogleDrive();
                     } else if (attempts >= maxAttempts) {
                         clearInterval(waitForAPIs);
-                        console.log('⚠️ No token found. Sign in required.');
-                        console.log('💡 Click "Upload to Drive" to authenticate, then auto-load will work on next refresh.');
+                        console.log('[WARNING] No token found. Sign in required.');
+                        console.log('[INFO] Click "Upload to Drive" to authenticate, then auto-load will work on next refresh.');
                     }
                 } else if (attempts >= maxAttempts) {
                     clearInterval(waitForAPIs);
-                    console.log('❌ Could not auto-load from Drive - APIs not ready');
+                    console.log('[ERROR] Could not auto-load from Drive - APIs not ready');
                 }
             }, 500);
         }
@@ -1369,14 +1397,14 @@
                     try {
                         data = JSON.parse(responseText);
                     } catch (parseError) {
-                        console.error('❌ JSON Parse Error:', parseError);
+                        console.error('[ERROR] JSON Parse Error:', parseError);
                         console.log('First 500 chars:', responseText.substring(0, 500));
                         console.log('Last 500 chars:', responseText.substring(responseText.length - 500));
                         showToast('Error parsing Drive data. File may be corrupted.', 'error');
                         return;
                     }
                     
-                    console.log('📥 LOADED FROM DRIVE:', {
+                    console.log('[LOAD] LOADED FROM DRIVE:', {
                         hasChapters: !!data.chapters,
                         chaptersCount: data.chapters?.length || 0,
                         totalChapters: data.totalChapters || 'not specified',
@@ -1400,7 +1428,7 @@
                             }
                         });
                         
-                        console.log('🔍 DEEP VERIFICATION:', {
+                        console.log('[SEARCH] DEEP VERIFICATION:', {
                             totalQuestionsInData,
                             questionsWithImages,
                             questionsWithoutImages: totalQuestionsInData - questionsWithImages
@@ -1410,27 +1438,27 @@
                         
                         // Don't save to localStorage if too large
                         const dataSize = JSON.stringify(chapters).length;
-                        console.log(`💾 Data size: ${(dataSize / (1024 * 1024)).toFixed(2)} MB`);
+                        console.log(`[STORAGE] Data size: ${(dataSize / (1024 * 1024)).toFixed(2)} MB`);
                         
                         if (dataSize < 5 * 1024 * 1024) { // Less than 5MB
                             try {
                                 localStorage.setItem('chapters', JSON.stringify(chapters));
-                                console.log('✅ Cached to localStorage');
+                                console.log('[SUCCESS] Cached to localStorage');
                             } catch (e) {
-                                console.log('⚠️ Could not cache to localStorage:', e.message);
+                                console.log('[WARNING] Could not cache to localStorage:', e.message);
                             }
                         } else {
-                            console.log('⚠️ Data too large for localStorage, skipping cache');
+                            console.log('[WARNING] Data too large for localStorage, skipping cache');
                         }
                         
                         renderChapters();
                         renderContent();
                         
                         const questionCount = chapters.reduce((sum, ch) => sum + ch.questions.length, 0);
-                        console.log(`✅ RENDER COMPLETE: ${questionCount} questions in memory`);
+                        console.log(`[SUCCESS] RENDER COMPLETE: ${questionCount} questions in memory`);
                         
                         if (questionCount !== totalQuestionsInData) {
-                            console.error('❌ MISMATCH: Rendered questions != Loaded questions');
+                            console.error('[ERROR] MISMATCH: Rendered questions != Loaded questions');
                         }
                         
                         // Remove loading indicator if present
@@ -1439,7 +1467,7 @@
                         
                         showToast(`✅ Loaded ${questionCount} questions from Drive!`, 'success');
                     } else {
-                        console.error('❌ Invalid data structure:', data);
+                        console.error('[ERROR] Invalid data structure:', data);
                         showToast('Invalid data format in Drive', 'error');
                     }
                 } else if (response.status === 404) {
@@ -1454,7 +1482,7 @@
                     showToast(`Could not load from Drive (Error ${response.status})`, 'error');
                 }
             } catch (error) {
-                console.error('❌ Error loading from Drive:', error);
+                console.error('[ERROR] Error loading from Drive:', error);
                 showToast('Error loading from Drive. Check console.', 'error');
             } finally {
                 isLoadingFromDrive = false;
@@ -1462,7 +1490,7 @@
         }
         
         function saveData() {
-            console.log('💾 saveData() called');
+            console.log('[STORAGE] saveData() called');
             
             // Check token from gapi.client if accessToken variable is not set
             if (!accessToken && gapi && gapi.client) {
@@ -1473,7 +1501,7 @@
             }
             
             // Debug logging
-            console.log('📊 Auto-upload check:', {
+            console.log('[STATS] Auto-upload check:', {
                 autoSyncEnabled: autoSyncEnabled,
                 hasAccessToken: !!accessToken,
                 hasDriveFileId: !!driveFileId,
@@ -1482,7 +1510,7 @@
             
             // If auto-sync is enabled and we have Drive access, prioritize Drive storage
             if (autoSyncEnabled && accessToken && driveFileId) {
-                console.log('✅ Auto-uploading to Drive...');
+                console.log('[SUCCESS] Auto-uploading to Drive...');
                 
                 // Save minimal data to localStorage (just metadata)
                 try {
@@ -1504,7 +1532,7 @@
             
             // If auto-sync is enabled but no token/file ID, inform user
             if (autoSyncEnabled && (!accessToken || !driveFileId)) {
-                console.log('⚠️ Auto-sync is ON but not ready:', {
+                console.log('[WARNING] Auto-sync is ON but not ready:', {
                     needsAuthentication: !accessToken,
                     needsFirstUpload: !driveFileId
                 });
@@ -1513,7 +1541,7 @@
             // Otherwise, try to save to localStorage
             try {
                 localStorage.setItem('chapters', JSON.stringify(chapters));
-                console.log('💾 Saved to localStorage');
+                console.log('[STORAGE] Saved to localStorage');
             } catch (e) {
                 if (e.name === 'QuotaExceededError') {
                     handleQuotaExceeded();
@@ -1567,7 +1595,7 @@
             modal.className = 'modal active storage-full-modal';
             modal.innerHTML = `
                 <div class="modal-content" style="max-width: 500px; padding: 32px;">
-                    <h2 style="margin-bottom: 16px; color: var(--text-primary);">⚠️ Storage Full</h2>
+                    <h2 style="margin-bottom: 16px; color: var(--text-primary);">Storage Full</h2>
                     <p style="color: var(--text-secondary); margin-bottom: 20px; line-height: 1.6;">
                         Your browser's local storage is full. To continue adding questions, you need to:
                     </p>
@@ -1578,7 +1606,7 @@
                     </ol>
                     <div style="background: var(--primary-light); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
                         <div style="font-size: 0.875rem; color: var(--text-primary); line-height: 1.6;">
-                            💡 <strong>Tip:</strong> Enable "Auto-sync to Drive" to prevent this in future. Once enabled, data will be stored in Google Drive instead of browser storage.
+                            <strong>Tip:</strong> Enable "Auto-sync to Drive" to prevent this in future. Once enabled, data will be stored in Google Drive instead of browser storage.
                         </div>
                     </div>
                     <div style="display: flex; gap: 12px; justify-content: flex-end;">
@@ -1607,13 +1635,13 @@
             if (enabled) {
                 if (!accessToken) {
                     // Authenticate first
-                    updateAutoSyncStatus('⚠️ Authenticating...', 'orange');
+                    updateAutoSyncStatus('[WARNING] Authenticating...', 'orange');
                     syncToGoogleDrive();
                 } else if (!driveFileId) {
-                    updateAutoSyncStatus('⚠️ Upload once to initialize', 'orange');
+                    updateAutoSyncStatus('[WARNING] Upload once to initialize', 'orange');
                     showToast('Please upload to Drive once to initialize auto-sync', 'info');
                 } else {
-                    updateAutoSyncStatus('✅ Active', 'green');
+                    updateAutoSyncStatus('[SUCCESS] Active', 'green');
                     showToast('Auto-sync enabled!', 'success');
                 }
             } else {
@@ -1645,11 +1673,11 @@
             }
             
             if (!hasToken) {
-                updateAutoSyncStatus('⚠️ Not authenticated', 'orange');
+                updateAutoSyncStatus('[WARNING] Not authenticated', 'orange');
             } else if (!driveFileId) {
-                updateAutoSyncStatus('⚠️ Not initialized', 'orange');
+                updateAutoSyncStatus('[WARNING] Not initialized', 'orange');
             } else {
-                updateAutoSyncStatus('✅ Active', 'green');
+                updateAutoSyncStatus('[SUCCESS] Active', 'green');
             }
         }
         
@@ -2205,9 +2233,9 @@
                     discoveryDocs: DISCOVERY_DOCS,
                 });
                 gapiInited = true;
-                console.log('✅ GAPI initialized successfully with API Key');
+                console.log('[SUCCESS] GAPI initialized successfully with API Key');
             } catch (error) {
-                console.error('❌ Error initializing GAPI:', error);
+                console.error('[ERROR] Error initializing GAPI:', error);
                 showToast('Failed to initialize Google Drive API', 'error');
             }
         }
@@ -2220,7 +2248,7 @@
                     callback: '', // Will be set when sync is called
                 });
                 gisInited = true;
-                console.log('✅ GIS initialized successfully');
+                console.log('[SUCCESS] GIS initialized successfully');
                 
                 // Check if we have a stored token and restore it
                 const storedToken = localStorage.getItem('gapi_token');
@@ -2234,7 +2262,7 @@
                                 if (gapi && gapi.client) {
                                     gapi.client.setToken(tokenObj);
                                     accessToken = tokenObj.access_token;
-                                    console.log('✅ Restored previous session token');
+                                    console.log('[SUCCESS] Restored previous session token');
                                     
                                     // Restore user profile
                                     const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
@@ -2242,22 +2270,22 @@
                                         updateUserProfile(userInfo);
                                     }
                                 } else {
-                                    console.log('⚠️ gapi.client not ready yet');
+                                    console.log('[WARNING] gapi.client not ready yet');
                                 }
                             }, 1000);
                         } else {
-                            console.log('⚠️ Stored token expired, removing...');
+                            console.log('[WARNING] Stored token expired, removing...');
                             localStorage.removeItem('gapi_token');
                         }
                     } catch (e) {
-                        console.log('⚠️ Could not restore token:', e);
+                        console.log('[WARNING] Could not restore token:', e);
                         localStorage.removeItem('gapi_token');
                     }
                 } else {
-                    console.log('💡 No stored token. Sign in required for auto-load.');
+                    console.log('[INFO] No stored token. Sign in required for auto-load.');
                 }
             } catch (error) {
-                console.error('❌ Error initializing GIS:', error);
+                console.error('[ERROR] Error initializing GIS:', error);
                 showToast('Failed to initialize Google authentication', 'error');
             }
         }
@@ -2386,7 +2414,7 @@
         
         function syncToGoogleDrive() {
             // Allow sign-in even with no chapters - we might want to load from Drive
-            console.log('🔄 syncToGoogleDrive called');
+            console.log('[SYNC] syncToGoogleDrive called');
             console.log('Chapters count:', chapters.length);
             console.log('Drive file ID:', driveFileId);
             
@@ -2409,18 +2437,18 @@
                 
                 // Check if Drive file exists - if yes, load first then merge
                 if (driveFileId) {
-                    console.log('🔄 Drive file exists, loading before sync...');
+                    console.log('[SYNC] Drive file exists, loading before sync...');
                     loadAndMergeFromDrive();
                 } else {
                     // Search for existing file or upload if we have chapters
-                    console.log('🔍 Searching for existing Drive file...');
+                    console.log('[SEARCH] Searching for existing Drive file...');
                     searchAndLoadOrUpload();
                 }
                 return;
             }
             
             // Need to get a new token - this will trigger sign-in
-            console.log('🔐 Requesting new token (sign-in)...');
+            console.log('[AUTH] Requesting new token (sign-in)...');
             tokenClient.callback = handleAuthCallback;
             
             // Request token with prompt='none' to avoid popup if already authenticated
@@ -2436,38 +2464,38 @@
             const existingFileId = await searchForDriveFile();
             
             if (existingFileId) {
-                console.log('✅ Found existing Drive file:', existingFileId);
+                console.log('[SUCCESS] Found existing Drive file:', existingFileId);
                 driveFileId = existingFileId;
                 localStorage.setItem('driveFileId', driveFileId);
                 await loadAndMergeFromDrive();
             } else if (chapters.length > 0) {
                 // No existing file but we have chapters, upload them
-                console.log('📤 No existing Drive file, uploading current data...');
+                console.log('[UPLOAD] No existing Drive file, uploading current data...');
                 await uploadToGoogleDrive();
             } else {
                 // No file in Drive and no local chapters
-                console.log('✅ Signed in successfully! No data to sync yet.');
+                console.log('[SUCCESS] Signed in successfully! No data to sync yet.');
                 showToast('Signed in successfully! Add questions to start syncing.', 'success');
             }
         }
         
         async function handleAuthCallback(resp) {
-                console.log('🔐 Token callback triggered');
+                console.log('[AUTH] Token callback triggered');
                 console.log('Response:', resp);
                 
                 if (resp.error !== undefined) {
-                    console.error('❌ Auth error:', resp);
+                    console.error('[ERROR] Auth error:', resp);
                     showToast('Authentication failed. Please try again.', 'error');
                     return;
                 }
                 
-                console.log('✅ No error in response');
+                console.log('[SUCCESS] No error in response');
                 
                 const token = gapi.client.getToken();
-                console.log('🎫 Token from gapi.client:', token);
+                console.log('[TOKEN] Token from gapi.client:', token);
                 
                 accessToken = token.access_token;
-                console.log('✅ accessToken set:', accessToken ? 'Yes' : 'No');
+                console.log('[SUCCESS] accessToken set:', accessToken ? 'Yes' : 'No');
                 
                 // Store token with expiration time (tokens typically last 1 hour = 3600 seconds)
                 const tokenWithExpiry = {
@@ -2475,29 +2503,29 @@
                     expires_at: Date.now() + (3600 * 1000) // 1 hour from now
                 };
                 localStorage.setItem('gapi_token', JSON.stringify(tokenWithExpiry));
-                console.log('✅ Token stored in localStorage');
+                console.log('[SUCCESS] Token stored in localStorage');
                 
                 // Extract user info - use gapi.client.request for proper authentication
                 let userEmail = '';
                 let userName = '';
                 
-                console.log('👤 Extracting user info...');
+                console.log('[USER] Extracting user info...');
                 
                 try {
-                    console.log('🔍 Using gapi.client.request for user info...');
+                    console.log('[SEARCH] Using gapi.client.request for user info...');
                     
                     // Load the oauth2 API
                     await gapi.client.load('oauth2', 'v2');
                     
                     // Get user info using gapi client
                     const userInfoResponse = await gapi.client.oauth2.userinfo.get();
-                    console.log('✅ Got user info:', userInfoResponse.result);
+                    console.log('[SUCCESS] Got user info:', userInfoResponse.result);
                     
                     userEmail = userInfoResponse.result.email || '';
                     userName = userInfoResponse.result.name || userInfoResponse.result.given_name || '';
                     
                 } catch (e) {
-                    console.log('⚠️ Could not fetch user info via gapi, trying fallback:', e);
+                    console.log('[WARNING] Could not fetch user info via gapi, trying fallback:', e);
                     
                     // Fallback: try direct fetch
                     try {
@@ -2509,10 +2537,10 @@
                             const data = await response.json();
                             userEmail = data.email || '';
                             userName = data.name || '';
-                            console.log('✅ Got user info from direct fetch:', data);
+                            console.log('[SUCCESS] Got user info from direct fetch:', data);
                         }
                     } catch (e2) {
-                        console.log('⚠️ All methods failed, using token hint');
+                        console.log('[WARNING] All methods failed, using token hint');
                         // Last resort: use token hint or default
                         userEmail = token.login_hint || 'user@gmail.com';
                         userName = userEmail.split('@')[0];
@@ -2525,61 +2553,61 @@
                 };
                 
                 localStorage.setItem('userInfo', JSON.stringify(userInfo));
-                console.log('👤 User info stored in localStorage:', userInfo);
+                console.log('[USER] User info stored in localStorage:', userInfo);
                 
                 // Update UI immediately (with delay to ensure DOM is ready)
-                console.log('🎨 Calling updateUserProfile...');
+                console.log('[UI] Calling updateUserProfile...');
                 setTimeout(() => {
                     updateUserProfile(userInfo);
                 }, 500);
                 
                 // After authentication, check if Drive file exists
-                console.log('💾 Checking for Drive file...');
+                console.log('[STORAGE] Checking for Drive file...');
                 console.log('Current driveFileId:', driveFileId);
                 
                 if (driveFileId) {
-                    console.log('🔄 Drive file ID exists, loading from Drive...');
+                    console.log('[SYNC] Drive file ID exists, loading from Drive...');
                     await loadAndMergeFromDrive();
                 } else {
                     // Search for existing Drive file
-                    console.log('🔍 No stored file ID, searching for existing Drive file...');
+                    console.log('[SEARCH] No stored file ID, searching for existing Drive file...');
                     const existingFileId = await searchForDriveFile();
                     
                     console.log('Search result:', existingFileId);
                     
                     if (existingFileId) {
-                        console.log('✅ Found existing Drive file:', existingFileId);
+                        console.log('[SUCCESS] Found existing Drive file:', existingFileId);
                         driveFileId = existingFileId;
                         localStorage.setItem('driveFileId', driveFileId);
                         await loadAndMergeFromDrive();
                     } else {
                         // No existing file, upload current data if we have chapters
                         if (chapters.length > 0) {
-                            console.log('📤 No existing Drive file, uploading current data...');
+                            console.log('[UPLOAD] No existing Drive file, uploading current data...');
                             await uploadToGoogleDrive();
                         } else {
-                            console.log('✅ Signed in successfully! No data to sync yet.');
-                            showToast('✅ Signed in successfully! Add questions to start syncing.', 'success');
+                            console.log('[SUCCESS] Signed in successfully! No data to sync yet.');
+                            showToast('[SUCCESS] Signed in successfully! Add questions to start syncing.', 'success');
                         }
                     }
                 }
             }
-                console.log('🔐 Token callback triggered');
+                console.log('[AUTH] Token callback triggered');
                 console.log('Response:', resp);
                 
                 if (resp.error !== undefined) {
-                    console.error('❌ Auth error:', resp);
+                    console.error('[ERROR] Auth error:', resp);
                     showToast('Authentication failed. Please try again.', 'error');
                     return;
                 }
                 
-                console.log('✅ No error in response');
+                console.log('[SUCCESS] No error in response');
                 
                 const token = gapi.client.getToken();
-                console.log('🎫 Token from gapi.client:', token);
+                console.log('[TOKEN] Token from gapi.client:', token);
                 
                 accessToken = token.access_token;
-                console.log('✅ accessToken set:', accessToken ? 'Yes' : 'No');
+                console.log('[SUCCESS] accessToken set:', accessToken ? 'Yes' : 'No');
                 
                 // Store token with expiration time (tokens typically last 1 hour = 3600 seconds)
                 const tokenWithExpiry = {
@@ -2587,29 +2615,29 @@
                     expires_at: Date.now() + (3600 * 1000) // 1 hour from now
                 };
                 localStorage.setItem('gapi_token', JSON.stringify(tokenWithExpiry));
-                console.log('✅ Token stored in localStorage');
+                console.log('[SUCCESS] Token stored in localStorage');
                 
                 // Extract user info - use gapi.client.request for proper authentication
                 let userEmail = '';
                 let userName = '';
                 
-                console.log('👤 Extracting user info...');
+                console.log('[USER] Extracting user info...');
                 
                 try {
-                    console.log('🔍 Using gapi.client.request for user info...');
+                    console.log('[SEARCH] Using gapi.client.request for user info...');
                     
                     // Load the oauth2 API
                     await gapi.client.load('oauth2', 'v2');
                     
                     // Get user info using gapi client
                     const userInfoResponse = await gapi.client.oauth2.userinfo.get();
-                    console.log('✅ Got user info:', userInfoResponse.result);
+                    console.log('[SUCCESS] Got user info:', userInfoResponse.result);
                     
                     userEmail = userInfoResponse.result.email || '';
                     userName = userInfoResponse.result.name || userInfoResponse.result.given_name || '';
                     
                 } catch (e) {
-                    console.log('⚠️ Could not fetch user info via gapi, trying fallback:', e);
+                    console.log('[WARNING] Could not fetch user info via gapi, trying fallback:', e);
                     
                     // Fallback: try direct fetch
                     try {
@@ -2621,10 +2649,10 @@
                             const data = await response.json();
                             userEmail = data.email || '';
                             userName = data.name || '';
-                            console.log('✅ Got user info from direct fetch:', data);
+                            console.log('[SUCCESS] Got user info from direct fetch:', data);
                         }
                     } catch (e2) {
-                        console.log('⚠️ All methods failed, using token hint');
+                        console.log('[WARNING] All methods failed, using token hint');
                         // Last resort: use token hint or default
                         userEmail = token.login_hint || 'user@gmail.com';
                         userName = userEmail.split('@')[0];
@@ -2637,40 +2665,40 @@
                 };
                 
                 localStorage.setItem('userInfo', JSON.stringify(userInfo));
-                console.log('👤 User info stored in localStorage:', userInfo);
+                console.log('[USER] User info stored in localStorage:', userInfo);
                 
                 // Update UI immediately (with delay to ensure DOM is ready)
-                console.log('🎨 Calling updateUserProfile...');
+                console.log('[UI] Calling updateUserProfile...');
                 setTimeout(() => {
                     updateUserProfile(userInfo);
                 }, 500);
                 
                 // After authentication, check if Drive file exists
-                console.log('💾 Checking for Drive file...');
+                console.log('[STORAGE] Checking for Drive file...');
                 console.log('Current driveFileId:', driveFileId);
                 
                 if (driveFileId) {
-                    console.log('🔄 Drive file ID exists, loading from Drive...');
+                    console.log('[SYNC] Drive file ID exists, loading from Drive...');
                     await loadAndMergeFromDrive();
                 } else {
                     // Search for existing Drive file
-                    console.log('🔍 No stored file ID, searching for existing Drive file...');
+                    console.log('[SEARCH] No stored file ID, searching for existing Drive file...');
                     const existingFileId = await searchForDriveFile();
                     
                     console.log('Search result:', existingFileId);
                     
                     if (existingFileId) {
-                        console.log('✅ Found existing Drive file:', existingFileId);
+                        console.log('[SUCCESS] Found existing Drive file:', existingFileId);
                         driveFileId = existingFileId;
                         localStorage.setItem('driveFileId', driveFileId);
                         await loadAndMergeFromDrive();
                     } else {
                         // No existing file, upload current data
-                        console.log('📤 No existing Drive file, uploading current data...');
+                        console.log('[UPLOAD] No existing Drive file, uploading current data...');
                         if (chapters.length > 0) {
                             await uploadToGoogleDrive();
                         } else {
-                            console.log('⚠️ No chapters to upload');
+                            console.log('[WARNING] No chapters to upload');
                             showToast('Signed in successfully! Add questions to sync.', 'success');
                         }
                     }
@@ -2698,12 +2726,12 @@
                 
                 if (response.ok) {
                     const data = await response.json();
-                    console.log('🔍 Drive search results:', data);
+                    console.log('[SEARCH] Drive search results:', data);
                     
                     if (data.files && data.files.length > 0) {
                         // Return the most recent file
                         const file = data.files[0];
-                        console.log('✅ Found existing file:', file);
+                        console.log('[SUCCESS] Found existing file:', file);
                         return file.id;
                     }
                 }
@@ -2732,7 +2760,7 @@
                         const driveQuestions = driveData.chapters.reduce((sum, ch) => sum + ch.questions.length, 0);
                         const localQuestions = chapters.reduce((sum, ch) => sum + ch.questions.length, 0);
                         
-                        console.log('🔄 MERGE CHECK:', {
+                        console.log('[SYNC] MERGE CHECK:', {
                             driveQuestions,
                             localQuestions,
                             totalAfterMerge: driveQuestions // We'll use Drive as source of truth
@@ -2777,7 +2805,7 @@
             modal.className = 'modal active';
             modal.innerHTML = `
                 <div class="modal-content" style="max-width: 500px; padding: 32px;">
-                    <h2 style="margin-bottom: 16px; color: var(--text-primary);">⚠️ Data Conflict</h2>
+                    <h2 style="margin-bottom: 16px; color: var(--text-primary);">Data Conflict</h2>
                     <p style="color: var(--text-secondary); margin-bottom: 20px; line-height: 1.6;">
                         Your local storage has <strong>${localCount} questions</strong> but Drive has <strong>${driveCount} questions</strong>.
                     </p>
@@ -2787,7 +2815,7 @@
                     </p>
                     <div style="background: var(--primary-light); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
                         <div style="font-size: 0.875rem; color: var(--text-primary); line-height: 1.6;">
-                            💡 <strong>Tip:</strong> Enable Auto-sync to prevent this in future!
+                            <strong>Tip:</strong> Enable Auto-sync to prevent this in future!
                         </div>
                     </div>
                     <div style="display: flex; gap: 12px; justify-content: flex-end;">
@@ -2801,11 +2829,11 @@
         }
         
         function updateUserProfile(userInfo) {
-            console.log('👤 updateUserProfile called with:', userInfo);
+            console.log('[USER] updateUserProfile called with:', userInfo);
             
             // Create or update user profile display
             let profileDiv = document.getElementById('userProfile');
-            console.log('📍 Existing profile div:', !!profileDiv);
+            console.log('[CHECK] Existing profile div:', !!profileDiv);
             
             if (!profileDiv) {
                 profileDiv = document.createElement('div');
@@ -2813,38 +2841,48 @@
                 profileDiv.style.cssText = 'display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--bg-main); border-radius: 8px; border: 1px solid var(--border); margin-bottom: 16px;';
                 
                 const syncSection = document.querySelector('.sync-section');
-                console.log('📍 Sync section found:', !!syncSection);
+                console.log('[CHECK] Sync section found:', !!syncSection);
                 
                 if (syncSection) {
                     // Insert profile after sync section
                     syncSection.parentNode.insertBefore(profileDiv, syncSection.nextSibling);
-                    console.log('✅ Profile div inserted after sync section');
+                    console.log('[SUCCESS] Profile div inserted after sync section');
                 } else {
                     // Fallback: insert at the beginning of sidebar-header
                     const sidebarHeader = document.querySelector('.sidebar-header');
                     if (sidebarHeader) {
                         sidebarHeader.insertBefore(profileDiv, sidebarHeader.firstChild.nextSibling);
-                        console.log('✅ Profile div inserted in sidebar header');
+                        console.log('[SUCCESS] Profile div inserted in sidebar header');
                     }
                 }
             }
             
             profileDiv.innerHTML = `
-                <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 1rem; flex-shrink: 0;">
-                    ${userInfo.name?.charAt(0).toUpperCase() || 'U'}
+                <div style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%); display: flex; align-items: center; justify-content: center; color: white; flex-shrink: 0; box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);">
+                    <svg width="22" height="22" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+                    </svg>
                 </div>
                 <div style="flex: 1; min-width: 0;">
-                    <div style="font-weight: 600; font-size: 0.8125rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${userInfo.name || 'User'}</div>
-                    <div style="font-size: 0.6875rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${userInfo.email || ''}</div>
+                    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+                        <span style="font-weight: 600; font-size: 0.875rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${userInfo.name || 'User'}</span>
+                        <span style="display: inline-flex; align-items: center; padding: 2px 6px; background: #10b981; color: white; border-radius: 10px; font-size: 0.625rem; font-weight: 600; letter-spacing: 0.02em;">
+                            <svg width="10" height="10" fill="currentColor" viewBox="0 0 24 24" style="margin-right: 3px;">
+                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                            </svg>
+                            SYNCED
+                        </span>
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${userInfo.email || ''}</div>
                 </div>
-                <button class="btn-icon" onclick="signOutGoogle()" title="Sign Out" style="width: 28px; height: 28px; padding: 0; flex-shrink: 0;">
-                    <svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button class="btn-icon" onclick="signOutGoogle()" title="Sign Out" style="width: 32px; height: 32px; padding: 0; flex-shrink: 0; opacity: 0.7; transition: opacity 0.2s;">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
                     </svg>
                 </button>
             `;
             
-            console.log('✅ Profile HTML updated');
+            console.log('[SUCCESS] Profile HTML updated');
         }
         
         function signOutGoogle() {
@@ -2951,7 +2989,7 @@
             
             // Count questions before upload
             const totalQuestions = chapters.reduce((sum, ch) => sum + ch.questions.length, 0);
-            console.log(`📊 UPLOAD STATS:`, {
+            console.log(`[STATS] UPLOAD STATS:`, {
                 chapters: chapters.length,
                 totalQuestions: totalQuestions,
                 fileSize: `${(fileContent.length / (1024 * 1024)).toFixed(2)} MB`,
@@ -2963,7 +3001,7 @@
                 ? `https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=resumable`
                 : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable';
             
-            console.log('🔄 Initializing resumable upload...');
+            console.log('[SYNC] Initializing resumable upload...');
             const initResponse = await fetch(initUrl, {
                 method: driveFileId ? 'PATCH' : 'POST',
                 headers: {
@@ -2975,7 +3013,7 @@
             
             if (!initResponse.ok) {
                 const errorText = await initResponse.text();
-                console.error('❌ Init failed:', initResponse.status, errorText);
+                console.error('[ERROR] Init failed:', initResponse.status, errorText);
                 throw new Error('Failed to initialize upload: ' + initResponse.status);
             }
             
@@ -2984,7 +3022,7 @@
                 throw new Error('No upload URL received');
             }
             
-            console.log('✅ Upload URL received, uploading content...');
+            console.log('[SUCCESS] Upload URL received, uploading content...');
             
             // Step 2: Upload the file content
             const uploadResponse = await fetch(uploadUrl, {
@@ -2997,7 +3035,7 @@
             
             if (!uploadResponse.ok) {
                 const errorText = await uploadResponse.text();
-                console.error('❌ Upload failed:', uploadResponse.status, errorText);
+                console.error('[ERROR] Upload failed:', uploadResponse.status, errorText);
                 throw new Error('Upload failed: ' + uploadResponse.status);
             }
             
@@ -3007,7 +3045,7 @@
                 localStorage.setItem('driveFileId', driveFileId);
                 
                 const sizeMB = (fileContent.length / (1024 * 1024)).toFixed(2);
-                console.log('✅ UPLOAD SUCCESS:', {
+                console.log('[SUCCESS] UPLOAD SUCCESS:', {
                     fileId: result.id,
                     size: `${sizeMB} MB`,
                     chapters: chapters.length,
@@ -3018,7 +3056,7 @@
                 
                 // VERIFICATION: Immediately load back to verify
                 setTimeout(() => {
-                    console.log('🔍 Verifying upload...');
+                    console.log('[SEARCH] Verifying upload...');
                     verifyDriveData();
                 }, 2000);
             } else {
@@ -3039,15 +3077,15 @@
                     const data = await response.json();
                     const loadedQuestions = data.chapters.reduce((sum, ch) => sum + ch.questions.length, 0);
                     
-                    console.log('🔍 VERIFICATION RESULT:', {
+                    console.log('[SEARCH] VERIFICATION RESULT:', {
                         chaptersInDrive: data.chapters.length,
                         questionsInDrive: loadedQuestions,
                         questionsInMemory: chapters.reduce((sum, ch) => sum + ch.questions.length, 0),
-                        match: loadedQuestions === chapters.reduce((sum, ch) => sum + ch.questions.length, 0) ? '✅ MATCH' : '❌ MISMATCH'
+                        match: loadedQuestions === chapters.reduce((sum, ch) => sum + ch.questions.length, 0) ? '[SUCCESS] MATCH' : '[ERROR] MISMATCH'
                     });
                     
                     if (loadedQuestions !== chapters.reduce((sum, ch) => sum + ch.questions.length, 0)) {
-                        showToast('⚠️ Warning: Data verification failed! Some questions may be missing.', 'error');
+                        showToast('[WARNING] Warning: Data verification failed! Some questions may be missing.', 'error');
                     }
                 } else {
                     console.log('Could not verify:', response.status);
@@ -3344,19 +3382,34 @@
             toast.className = 'toast';
             
             let icon = '';
+            let iconBg = '';
+            let iconColor = '';
+            
             if (type === 'success') {
-                icon = '<svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+                iconBg = '#10b981';
+                iconColor = 'white';
+                icon = '<svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>';
             } else if (type === 'error') {
-                icon = '<svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+                iconBg = '#ef4444';
+                iconColor = 'white';
+                icon = '<svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>';
             } else {
-                icon = '<svg class="icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
+                iconBg = '#3b82f6';
+                iconColor = 'white';
+                icon = '<svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
             }
             
-            toast.innerHTML = icon + '<span>' + message + '</span>';
+            toast.innerHTML = `
+                <div style="width: 32px; height: 32px; border-radius: 8px; background: ${iconBg}; display: flex; align-items: center; justify-content: center; color: ${iconColor}; flex-shrink: 0;">
+                    ${icon}
+                </div>
+                <span style="flex: 1;">${message}</span>
+            `;
             document.body.appendChild(toast);
             
             setTimeout(() => {
-                toast.remove();
+                toast.style.animation = 'slideOutDown 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
             }, 3000);
         }
         
