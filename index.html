@@ -2283,26 +2283,6 @@
         }
         
         function syncToGoogleDrive() {
-            // This is now just a wrapper for handleGoogleSignIn
-            // It's called by saveData() for auto-upload
-            
-            if (chapters.length === 0) {
-                console.log('No chapters to sync');
-                return;
-            }
-            
-            // Check if we have a token
-            const currentToken = gapi?.client?.getToken();
-            if (currentToken && currentToken.access_token) {
-                // Already authenticated, just upload
-                accessToken = currentToken.access_token;
-                uploadToGoogleDrive();
-            } else {
-                // Need to authenticate first
-                console.log('No token, triggering sign in...');
-                handleGoogleSignIn();
-            }
-        }
             if (chapters.length === 0) {
                 showToast('No chapters to sync!', 'error');
                 return;
