@@ -1632,7 +1632,25 @@
             const statusDiv = document.getElementById('autoSyncStatus');
             if (statusDiv) {
                 statusDiv.textContent = message;
-                statusDiv.style.color = color === 'green' ? '#10b981' : color === 'orange' ? '#f59e0b' : 'var(--text-secondary)';
+                if (color === 'green') {
+                    statusDiv.style.color = '#10b981';
+                } else if (color === 'orange') {
+                    statusDiv.style.color = '#f59e0b';
+                } else if (color === 'red') {
+                    statusDiv.style.color = '#ef4444';
+                } else {
+                    statusDiv.style.color = 'var(--text-secondary)';
+                }
+                
+                // If session expired, show a more prominent message
+                if (message.includes('expired')) {
+                    statusDiv.innerHTML = `
+                        <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24" style="display: inline-block; margin-right: 4px; vertical-align: middle;">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                        </svg>
+                        <span style="vertical-align: middle;">${message} - Sign in again</span>
+                    `;
+                }
             }
         }
         
@@ -1643,19 +1661,53 @@
                 return;
             }
             
-            // Check token from gapi.client
-            let hasToken = !!accessToken;
-            if (!hasToken && gapi && gapi.client) {
-                const currentToken = gapi.client.getToken();
-                hasToken = !!(currentToken && currentToken.access_token);
+            // Check if token exists and is not expired
+            const storedToken = localStorage.getItem('gapi_token');
+            let hasValidToken = false;
+            
+            if (storedToken) {
+                try {
+                    const tokenObj = JSON.parse(storedToken);
+                    // Check if token is not expired
+                    if (tokenObj.expires_at && tokenObj.expires_at > Date.now()) {
+                        hasValidToken = true;
+                    } else {
+                        // Token expired, clean up
+                        console.log('[WARNING] Token expired during status check');
+                        localStorage.removeItem('gapi_token');
+                        localStorage.removeItem('userInfo');
+                        
+                        // Remove profile display
+                        const profileDiv = document.getElementById('userProfile');
+                        if (profileDiv) {
+                            profileDiv.remove();
+                        }
+                        
+                        // Show upload button again
+                        const uploadBtn = document.querySelector('.btn-backup[onclick="syncToGoogleDrive()"]');
+                        if (uploadBtn) {
+                            uploadBtn.style.display = '';
+                        }
+                    }
+                } catch (e) {
+                    console.log('[ERROR] Token parse error:', e);
+                    localStorage.removeItem('gapi_token');
+                    localStorage.removeItem('userInfo');
+                }
             }
             
-            if (!hasToken) {
-                updateAutoSyncStatus('[WARNING] Not authenticated', 'orange');
+            // Also check gapi.client token
+            if (!hasValidToken && gapi && gapi.client) {
+                const currentToken = gapi.client.getToken();
+                hasValidToken = !!(currentToken && currentToken.access_token);
+            }
+            
+            if (!hasValidToken) {
+                updateAutoSyncStatus('Session expired', 'orange');
             } else if (!driveFileId) {
-                updateAutoSyncStatus('[WARNING] Not initialized', 'orange');
+                updateAutoSyncStatus('Not initialized', 'orange');
             } else {
-                updateAutoSyncStatus('[SUCCESS] Active', 'green');
+                updateAutoSyncStatus('Active', 'green');
             }
         }
         
@@ -2204,6 +2256,91 @@
             }
         }
         
+        let tokenRefreshTimer = null;
+        
+        function scheduleTokenRefresh() {
+            // Clear any existing timer
+            if (tokenRefreshTimer) {
+                clearTimeout(tokenRefreshTimer);
+            }
+            
+            const storedToken = localStorage.getItem('gapi_token');
+            if (!storedToken) return;
+            
+            try {
+                const tokenObj = JSON.parse(storedToken);
+                if (!tokenObj.expires_at) return;
+                
+                // Calculate time until expiry
+                const timeUntilExpiry = tokenObj.expires_at - Date.now();
+                
+                // Refresh 5 minutes before expiry (or immediately if less than 5 min left)
+                const refreshTime = Math.max(0, timeUntilExpiry - (5 * 60 * 1000));
+                
+                console.log(`[INFO] Token will refresh in ${Math.round(refreshTime / 1000 / 60)} minutes`);
+                
+                tokenRefreshTimer = setTimeout(() => {
+                    console.log('[AUTH] Auto-refreshing token...');
+                    refreshToken();
+                }, refreshTime);
+            } catch (e) {
+                console.log('[ERROR] Could not schedule refresh:', e);
+            }
+        }
+        
+        async function refreshToken() {
+            if (!tokenClient) {
+                console.log('[WARNING] Cannot refresh - no token client');
+                return;
+            }
+            
+            try {
+                console.log('[AUTH] Requesting token refresh...');
+                
+                // Request a new token silently
+                tokenClient.callback = async (resp) => {
+                    if (resp.error !== undefined) {
+                        console.error('[ERROR] Token refresh failed:', resp.error);
+                        // Clear expired session
+                        localStorage.removeItem('gapi_token');
+                        localStorage.removeItem('userInfo');
+                        
+                        // Remove profile
+                        const profileDiv = document.getElementById('userProfile');
+                        if (profileDiv) profileDiv.remove();
+                        
+                        // Show upload button
+                        const uploadBtn = document.querySelector('.btn-backup[onclick="syncToGoogleDrive()"]');
+                        if (uploadBtn) uploadBtn.style.display = '';
+                        
+                        showToast('Session expired. Please sign in again.', 'info');
+                        return;
+                    }
+                    
+                    const token = gapi.client.getToken();
+                    accessToken = token.access_token;
+                    
+                    // Store refreshed token
+                    const tokenWithExpiry = {
+                        ...token,
+                        expires_at: Date.now() + (3600 * 1000)
+                    };
+                    localStorage.setItem('gapi_token', JSON.stringify(tokenWithExpiry));
+                    
+                    console.log('[SUCCESS] Token refreshed successfully');
+                    
+                    // Schedule next refresh
+                    scheduleTokenRefresh();
+                };
+                
+                // Request token with prompt='none' for silent refresh
+                tokenClient.requestAccessToken({prompt: ''});
+                
+            } catch (error) {
+                console.error('[ERROR] Token refresh error:', error);
+            }
+        }
+        
         function gisLoaded() {
             try {
                 tokenClient = google.accounts.oauth2.initTokenClient({
@@ -2227,6 +2364,9 @@
                                     gapi.client.setToken(tokenObj);
                                     accessToken = tokenObj.access_token;
                                     console.log('[SUCCESS] Restored previous session token');
+                                    
+                                    // Schedule auto-refresh for restored token
+                                    scheduleTokenRefresh();
                                     
                                     // Restore user profile
                                     const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
@@ -2468,6 +2608,9 @@
                 };
                 localStorage.setItem('gapi_token', JSON.stringify(tokenWithExpiry));
                 console.log('[SUCCESS] Token stored in localStorage');
+                
+                // Schedule automatic token refresh
+                scheduleTokenRefresh();
                 
                 // Extract user info - use gapi.client.request for proper authentication
                 let userEmail = '';
@@ -3277,15 +3420,44 @@
             }
         });
         
-        // Restore user profile if exists
+        // Restore user profile if token is valid
         setTimeout(() => {
+            const storedToken = localStorage.getItem('gapi_token');
             const storedUserInfo = localStorage.getItem('userInfo');
-            if (storedUserInfo) {
+            
+            if (storedToken && storedUserInfo) {
                 try {
+                    const tokenObj = JSON.parse(storedToken);
                     const userInfo = JSON.parse(storedUserInfo);
-                    updateUserProfile(userInfo);
+                    
+                    // Check if token is expired
+                    if (tokenObj.expires_at && tokenObj.expires_at > Date.now()) {
+                        // Token is still valid, restore profile
+                        console.log('[SUCCESS] Token valid, restoring profile');
+                        updateUserProfile(userInfo);
+                    } else {
+                        // Token expired, clear everything
+                        console.log('[WARNING] Token expired, clearing stored data');
+                        localStorage.removeItem('gapi_token');
+                        localStorage.removeItem('userInfo');
+                        
+                        // Remove profile if displayed
+                        const profileDiv = document.getElementById('userProfile');
+                        if (profileDiv) {
+                            profileDiv.remove();
+                        }
+                        
+                        // Show upload button again
+                        const uploadBtn = document.querySelector('.btn-backup[onclick="syncToGoogleDrive()"]');
+                        if (uploadBtn) {
+                            uploadBtn.style.display = '';
+                        }
+                    }
                 } catch (e) {
-                    console.log('Could not restore user profile');
+                    console.log('[ERROR] Could not restore profile:', e);
+                    // Clear corrupted data
+                    localStorage.removeItem('gapi_token');
+                    localStorage.removeItem('userInfo');
                 }
             }
         }, 1000);
